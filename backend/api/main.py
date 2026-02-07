@@ -107,6 +107,31 @@ class CategoryInfo(BaseModel):
     categories: List[str]
 
 
+class CategoryResponse(BaseModel):
+    id: int
+    name: str
+    type: str
+    is_active: bool
+    display_order: int
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class CategoryCreate(BaseModel):
+    name: str
+    type: str
+    display_order: int = 0
+
+
+class CategoryUpdate(BaseModel):
+    name: Optional[str] = None
+    type: Optional[str] = None
+    is_active: Optional[bool] = None
+    display_order: Optional[int] = None
+
+
 class SummaryItem(BaseModel):
     type: str
     category: str
@@ -802,11 +827,175 @@ def bulk_delete_budgets(budget_ids: List[int]):
 @app.get("/api/categories", response_model=List[CategoryInfo])
 def get_categories():
     """Get all available categories grouped by type."""
-    return [
-        CategoryInfo(type="Income", categories=pipeline_config.categories.income_categories),
-        CategoryInfo(type="Expenses", categories=pipeline_config.categories.expense_categories),
-        CategoryInfo(type="Savings", categories=pipeline_config.categories.savings_categories),
-    ]
+    session = db_manager.get_session()
+    try:
+        # Get categories from database
+        categories_db = session.query(Category).filter(Category.is_active.is_(True)).order_by(Category.display_order, Category.name).all()
+
+        # If no categories in DB, use config defaults
+        if not categories_db:
+            return [
+                CategoryInfo(type="Income", categories=pipeline_config.categories.income_categories),
+                CategoryInfo(type="Expenses", categories=pipeline_config.categories.expense_categories),
+                CategoryInfo(type="Savings", categories=pipeline_config.categories.savings_categories),
+            ]
+
+        # Group by type
+        grouped = {}
+        for cat in categories_db:
+            if cat.type not in grouped:
+                grouped[cat.type] = []
+            grouped[cat.type].append(cat.name)
+
+        return [CategoryInfo(type=t, categories=cats) for t, cats in grouped.items()]
+    finally:
+        session.close()
+
+
+@app.get("/api/categories/all", response_model=List[CategoryResponse])
+def get_all_categories(current_user: dict = Depends(get_current_user)):
+    """Get all categories (including inactive) for management."""
+    session = db_manager.get_session()
+    try:
+        categories = session.query(Category).order_by(Category.type, Category.display_order, Category.name).all()
+        return [CategoryResponse.model_validate(cat) for cat in categories]
+    finally:
+        session.close()
+
+
+@app.post("/api/categories", response_model=CategoryResponse, status_code=201)
+def create_category(category: CategoryCreate, current_user: dict = Depends(get_current_user)):
+    """Create a new category."""
+    session = db_manager.get_session()
+    try:
+        # Check if category already exists
+        existing = session.query(Category).filter(
+            Category.name == category.name,
+            Category.type == category.type
+        ).first()
+
+        if existing:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Category '{category.name}' already exists for type '{category.type}'"
+            )
+
+        # Create new category
+        new_category = Category(
+            name=category.name,
+            type=category.type,
+            display_order=category.display_order,
+            is_active=True
+        )
+
+        session.add(new_category)
+        session.commit()
+        session.refresh(new_category)
+
+        return CategoryResponse.model_validate(new_category)
+    except HTTPException:
+        session.rollback()
+        raise
+    except Exception as e:
+        session.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        session.close()
+
+
+@app.patch("/api/categories/{category_id}", response_model=CategoryResponse)
+def update_category(
+    category_id: int,
+    update: CategoryUpdate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Update an existing category."""
+    session = db_manager.get_session()
+    try:
+        category = session.query(Category).filter(Category.id == category_id).first()
+
+        if not category:
+            raise HTTPException(status_code=404, detail="Category not found")
+
+        # Update fields
+        if update.name is not None:
+            # Check for duplicate name
+            existing = session.query(Category).filter(
+                Category.name == update.name,
+                Category.type == (update.type if update.type else category.type),
+                Category.id != category_id
+            ).first()
+
+            if existing:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Category '{update.name}' already exists"
+                )
+
+            category.name = update.name
+
+        if update.type is not None:
+            category.type = update.type
+
+        if update.is_active is not None:
+            category.is_active = update.is_active
+
+        if update.display_order is not None:
+            category.display_order = update.display_order
+
+        session.commit()
+        session.refresh(category)
+
+        return CategoryResponse.model_validate(category)
+    except HTTPException:
+        session.rollback()
+        raise
+    except Exception as e:
+        session.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        session.close()
+
+
+@app.delete("/api/categories/{category_id}")
+def delete_category(category_id: int, current_user: dict = Depends(get_current_user)):
+    """Delete a category (soft delete by setting is_active=False)."""
+    session = db_manager.get_session()
+    try:
+        category = session.query(Category).filter(Category.id == category_id).first()
+
+        if not category:
+            raise HTTPException(status_code=404, detail="Category not found")
+
+        # Check if category is used in transactions or budgets
+        transaction_count = session.query(func.count(Transaction.id)).filter(
+            Transaction.category == category.name
+        ).scalar()
+
+        budget_count = session.query(func.count(BudgetPlan.id)).filter(
+            BudgetPlan.category == category.name
+        ).scalar()
+
+        if transaction_count > 0 or budget_count > 0:
+            # Soft delete
+            category.is_active = False
+            session.commit()
+            return {
+                "message": f"Category deactivated (used in {transaction_count} transactions and {budget_count} budgets)"
+            }
+        else:
+            # Hard delete if unused
+            session.delete(category)
+            session.commit()
+            return {"message": "Category deleted successfully"}
+    except HTTPException:
+        session.rollback()
+        raise
+    except Exception as e:
+        session.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        session.close()
 
 
 @app.get("/api/types")

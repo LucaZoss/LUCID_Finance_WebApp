@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Calculator, Plus, Trash2, Save, DollarSign } from 'lucide-react';
+import { Calculator, Plus, Trash2, Save, DollarSign, FolderPlus, Edit2, X, Sparkles, TrendingUp } from 'lucide-react';
 import type { BudgetPlan, CategoryInfo } from '../types';
 import * as api from '../api';
 
@@ -33,6 +33,26 @@ export default function BudgetPlanningPage() {
     isMonthly: false,
   });
 
+  // Category management
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [allCategories, setAllCategories] = useState<api.Category[]>([]);
+  const [newCategory, setNewCategory] = useState({
+    name: '',
+    type: 'Expenses',
+  });
+  const [editingCategory, setEditingCategory] = useState<api.Category | null>(null);
+
+  // Budget Helper Tool (Beta)
+  const [showBudgetHelper, setShowBudgetHelper] = useState(false);
+  const [helperIncome, setHelperIncome] = useState<number>(0);
+  const [helperAllocations, setHelperAllocations] = useState({
+    housing: 0,
+    healthInsurance: 0,
+    groceries: 0,
+    tax: 0,
+    trading: 0,
+  });
+
   const months = [
     'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
     'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
@@ -53,6 +73,175 @@ export default function BudgetPlanningPage() {
     } catch (error) {
       console.error('Failed to load categories:', error);
     }
+  };
+
+  const loadAllCategories = async () => {
+    try {
+      const allCats = await api.getAllCategories();
+      setAllCategories(allCats);
+    } catch (error) {
+      console.error('Failed to load all categories:', error);
+    }
+  };
+
+  const handleOpenCategoryModal = () => {
+    loadAllCategories();
+    setShowCategoryModal(true);
+  };
+
+  const handleCreateCategory = async () => {
+    if (!newCategory.name.trim()) {
+      alert('Please enter a category name');
+      return;
+    }
+
+    try {
+      await api.createCategory({
+        name: newCategory.name.trim(),
+        type: newCategory.type,
+      });
+
+      setNewCategory({ name: '', type: 'Expenses' });
+      await loadAllCategories();
+      await loadInitialData(); // Reload categories for dropdowns
+    } catch (error: any) {
+      console.error('Failed to create category:', error);
+      alert(error.response?.data?.detail || 'Failed to create category');
+    }
+  };
+
+  const handleEditCategory = (category: api.Category) => {
+    setEditingCategory(category);
+  };
+
+  const handleUpdateCategory = async () => {
+    if (!editingCategory) return;
+
+    try {
+      await api.updateCategory(editingCategory.id, {
+        name: editingCategory.name,
+        type: editingCategory.type,
+      });
+
+      setEditingCategory(null);
+      await loadAllCategories();
+      await loadInitialData();
+    } catch (error: any) {
+      console.error('Failed to update category:', error);
+      alert(error.response?.data?.detail || 'Failed to update category');
+    }
+  };
+
+  const handleDeleteCategory = async (categoryId: number) => {
+    if (!confirm('Are you sure you want to delete this category? It will be deactivated if used in transactions or budgets.')) {
+      return;
+    }
+
+    try {
+      const result = await api.deleteCategory(categoryId);
+      alert(result.message);
+      await loadAllCategories();
+      await loadInitialData();
+    } catch (error: any) {
+      console.error('Failed to delete category:', error);
+      alert(error.response?.data?.detail || 'Failed to delete category');
+    }
+  };
+
+  const handleToggleCategoryStatus = async (category: api.Category) => {
+    try {
+      await api.updateCategory(category.id, {
+        is_active: !category.is_active,
+      });
+      await loadAllCategories();
+      await loadInitialData();
+    } catch (error: any) {
+      console.error('Failed to toggle category status:', error);
+      alert(error.response?.data?.detail || 'Failed to update category');
+    }
+  };
+
+  // Budget Helper Functions
+  const calculateHelperPercentage = (amount: number): number => {
+    if (helperIncome <= 0) return 0;
+    return (amount / helperIncome) * 100;
+  };
+
+  const calculateHelperRemaining = (): number => {
+    const total = Object.values(helperAllocations).reduce((sum, val) => sum + val, 0);
+    return helperIncome - total;
+  };
+
+  const handleHelperAllocationChange = (category: keyof typeof helperAllocations, value: number) => {
+    setHelperAllocations({
+      ...helperAllocations,
+      [category]: value >= 0 ? value : 0,
+    });
+  };
+
+  const handleApplyHelperToMonthlyBudget = async () => {
+    if (helperIncome <= 0) {
+      alert('Please enter your monthly income first');
+      return;
+    }
+
+    const remaining = calculateHelperRemaining();
+    if (remaining < 0) {
+      alert(`Your allocations exceed your income by CHF ${Math.abs(remaining).toFixed(2)}. Please adjust.`);
+      return;
+    }
+
+    if (!confirm('This will create monthly budgets for the selected categories. Continue?')) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+
+      // Map helper categories to actual budget categories
+      const categoryMapping = {
+        housing: 'Housing',
+        healthInsurance: 'Health Insurance',
+        groceries: 'Groceries',
+        tax: 'Tax',
+        trading: 'Stock Portofolio', // or could be 'Savings'
+      };
+
+      // Create budgets for non-zero allocations
+      for (const [key, category] of Object.entries(categoryMapping)) {
+        const amount = helperAllocations[key as keyof typeof helperAllocations];
+        if (amount > 0) {
+          const type = key === 'trading' ? 'Savings' : 'Expenses';
+          await api.createBudget({
+            type,
+            category,
+            year: selectedYear,
+            month: null, // Yearly budget (could be changed to monthly)
+            amount: amount * 12, // Convert monthly to yearly
+          });
+        }
+      }
+
+      alert('Budget allocations applied successfully!');
+      setShowBudgetHelper(false);
+      await loadBudgets();
+    } catch (error: any) {
+      console.error('Failed to apply budget allocations:', error);
+      alert(error.response?.data?.detail || 'Failed to apply budget allocations');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const resetBudgetHelper = () => {
+    setHelperIncome(0);
+    setHelperAllocations({
+      housing: 0,
+      healthInsurance: 0,
+      groceries: 0,
+      tax: 0,
+      trading: 0,
+    });
   };
 
   const loadBudgets = async () => {
@@ -300,6 +489,23 @@ export default function BudgetPlanningPage() {
               Delete Selected ({selectedRows.size})
             </button>
           )}
+
+          <button
+            onClick={handleOpenCategoryModal}
+            className="mt-5 px-4 py-2 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 flex items-center"
+          >
+            <FolderPlus className="w-4 h-4 mr-2" />
+            Manage Categories
+          </button>
+
+          <button
+            onClick={() => setShowBudgetHelper(true)}
+            className="mt-5 px-4 py-2 bg-gradient-to-r from-orange-500 to-pink-500 text-white rounded-lg font-medium hover:from-orange-600 hover:to-pink-600 flex items-center relative"
+          >
+            <Sparkles className="w-4 h-4 mr-2" />
+            Budget Helper
+            <span className="ml-2 text-xs px-1.5 py-0.5 bg-white/20 rounded">BETA</span>
+          </button>
 
           <button
             onClick={() => setShowAddForm(true)}
@@ -582,6 +788,403 @@ export default function BudgetPlanningPage() {
           </div>
         </div>
       </div>
+
+      {/* Category Management Modal */}
+      {showCategoryModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+              <h2 className="text-xl font-semibold">Manage Categories</h2>
+              <button
+                onClick={() => setShowCategoryModal(false)}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              {/* Add New Category */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <h3 className="text-sm font-semibold text-blue-900 mb-3">Add New Category</h3>
+                <div className="grid md:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Type</label>
+                    <select
+                      value={newCategory.type}
+                      onChange={(e) => setNewCategory({ ...newCategory, type: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    >
+                      <option value="Income">Income</option>
+                      <option value="Expenses">Expenses</option>
+                      <option value="Savings">Savings</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Category Name</label>
+                    <input
+                      type="text"
+                      value={newCategory.name}
+                      onChange={(e) => setNewCategory({ ...newCategory, name: e.target.value })}
+                      placeholder="e.g., Entertainment"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div className="flex items-end">
+                    <button
+                      onClick={handleCreateCategory}
+                      className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+                    >
+                      <Plus className="w-4 h-4 inline mr-1" />
+                      Add Category
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Existing Categories */}
+              <div>
+                <h3 className="text-sm font-semibold text-gray-900 mb-3">Existing Categories</h3>
+                {['Income', 'Expenses', 'Savings'].map((type) => {
+                  const typeCats = allCategories.filter((cat) => cat.type === type);
+                  if (typeCats.length === 0) return null;
+
+                  return (
+                    <div key={type} className="mb-4">
+                      <h4 className="text-xs font-semibold text-gray-700 mb-2 uppercase">{type}</h4>
+                      <div className="space-y-2">
+                        {typeCats.map((cat) => (
+                          <div
+                            key={cat.id}
+                            className={`flex items-center justify-between p-3 rounded-lg border ${
+                              cat.is_active ? 'bg-white border-gray-200' : 'bg-gray-50 border-gray-300 opacity-60'
+                            }`}
+                          >
+                            {editingCategory?.id === cat.id ? (
+                              <>
+                                <div className="flex-1 flex items-center gap-2">
+                                  <input
+                                    type="text"
+                                    value={editingCategory.name}
+                                    onChange={(e) =>
+                                      setEditingCategory({ ...editingCategory, name: e.target.value })
+                                    }
+                                    className="flex-1 px-3 py-1 border border-gray-300 rounded text-sm"
+                                  />
+                                  <select
+                                    value={editingCategory.type}
+                                    onChange={(e) =>
+                                      setEditingCategory({ ...editingCategory, type: e.target.value })
+                                    }
+                                    className="px-3 py-1 border border-gray-300 rounded text-sm"
+                                  >
+                                    <option value="Income">Income</option>
+                                    <option value="Expenses">Expenses</option>
+                                    <option value="Savings">Savings</option>
+                                  </select>
+                                </div>
+                                <div className="flex items-center gap-2 ml-2">
+                                  <button
+                                    onClick={handleUpdateCategory}
+                                    className="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700"
+                                  >
+                                    <Save className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    onClick={() => setEditingCategory(null)}
+                                    className="px-3 py-1 bg-gray-300 text-gray-700 rounded text-sm hover:bg-gray-400"
+                                  >
+                                    <X className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </>
+                            ) : (
+                              <>
+                                <div className="flex items-center gap-3">
+                                  <span className={`text-sm font-medium ${cat.is_active ? 'text-gray-900' : 'text-gray-500'}`}>
+                                    {cat.name}
+                                  </span>
+                                  {!cat.is_active && (
+                                    <span className="text-xs px-2 py-0.5 bg-gray-200 text-gray-600 rounded">
+                                      Inactive
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    onClick={() => handleToggleCategoryStatus(cat)}
+                                    className={`text-xs px-3 py-1 rounded ${
+                                      cat.is_active
+                                        ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'
+                                        : 'bg-green-100 text-green-700 hover:bg-green-200'
+                                    }`}
+                                  >
+                                    {cat.is_active ? 'Deactivate' : 'Activate'}
+                                  </button>
+                                  <button
+                                    onClick={() => handleEditCategory(cat)}
+                                    className="p-1 text-blue-600 hover:bg-blue-50 rounded"
+                                    title="Edit"
+                                  >
+                                    <Edit2 className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteCategory(cat.id)}
+                                    className="p-1 text-red-600 hover:bg-red-50 rounded"
+                                    title="Delete"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="px-6 py-4 border-t border-gray-200 flex justify-end">
+              <button
+                onClick={() => setShowCategoryModal(false)}
+                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-medium"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Budget Helper Modal (BETA) */}
+      {showBudgetHelper && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-gradient-to-r from-orange-500 to-pink-500 rounded-lg">
+                    <Sparkles className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold text-gray-900">Budget Helper</h2>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-xs px-2 py-0.5 bg-gradient-to-r from-orange-500 to-pink-500 text-white rounded">
+                        BETA
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        Quickly allocate your monthly income
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowBudgetHelper(false);
+                    resetBudgetHelper();
+                  }}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-6">
+              {/* Monthly Income Input */}
+              <div className="bg-gradient-to-r from-orange-50 to-pink-50 p-4 rounded-lg border border-orange-200">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Monthly Income (CHF)
+                </label>
+                <input
+                  type="number"
+                  value={helperIncome || ''}
+                  onChange={(e) => setHelperIncome(parseFloat(e.target.value) || 0)}
+                  placeholder="Enter your monthly income"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  min="0"
+                  step="0.01"
+                />
+              </div>
+
+              {/* Allocation Inputs */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                  <TrendingUp className="w-5 h-5 text-orange-500" />
+                  Allocate Your Budget
+                </h3>
+
+                {/* Housing */}
+                <div className="bg-white p-4 rounded-lg border border-gray-200">
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-sm font-medium text-gray-700">
+                      Housing (Rent)
+                    </label>
+                    <span className="text-xs font-medium text-orange-600">
+                      {calculateHelperPercentage(helperAllocations.housing).toFixed(1)}%
+                    </span>
+                  </div>
+                  <input
+                    type="number"
+                    value={helperAllocations.housing || ''}
+                    onChange={(e) => handleHelperAllocationChange('housing', parseFloat(e.target.value) || 0)}
+                    placeholder="0.00"
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                    min="0"
+                    step="0.01"
+                  />
+                </div>
+
+                {/* Health Insurance */}
+                <div className="bg-white p-4 rounded-lg border border-gray-200">
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-sm font-medium text-gray-700">
+                      Health Insurance
+                    </label>
+                    <span className="text-xs font-medium text-orange-600">
+                      {calculateHelperPercentage(helperAllocations.healthInsurance).toFixed(1)}%
+                    </span>
+                  </div>
+                  <input
+                    type="number"
+                    value={helperAllocations.healthInsurance || ''}
+                    onChange={(e) => handleHelperAllocationChange('healthInsurance', parseFloat(e.target.value) || 0)}
+                    placeholder="0.00"
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                    min="0"
+                    step="0.01"
+                  />
+                </div>
+
+                {/* Groceries */}
+                <div className="bg-white p-4 rounded-lg border border-gray-200">
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-sm font-medium text-gray-700">
+                      Groceries
+                    </label>
+                    <span className="text-xs font-medium text-orange-600">
+                      {calculateHelperPercentage(helperAllocations.groceries).toFixed(1)}%
+                    </span>
+                  </div>
+                  <input
+                    type="number"
+                    value={helperAllocations.groceries || ''}
+                    onChange={(e) => handleHelperAllocationChange('groceries', parseFloat(e.target.value) || 0)}
+                    placeholder="0.00"
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                    min="0"
+                    step="0.01"
+                  />
+                </div>
+
+                {/* Tax */}
+                <div className="bg-white p-4 rounded-lg border border-gray-200">
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-sm font-medium text-gray-700">
+                      Tax
+                    </label>
+                    <span className="text-xs font-medium text-orange-600">
+                      {calculateHelperPercentage(helperAllocations.tax).toFixed(1)}%
+                    </span>
+                  </div>
+                  <input
+                    type="number"
+                    value={helperAllocations.tax || ''}
+                    onChange={(e) => handleHelperAllocationChange('tax', parseFloat(e.target.value) || 0)}
+                    placeholder="0.00"
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                    min="0"
+                    step="0.01"
+                  />
+                </div>
+
+                {/* Trading/Wealth */}
+                <div className="bg-white p-4 rounded-lg border border-gray-200">
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-sm font-medium text-gray-700">
+                      Trading/Wealth
+                    </label>
+                    <span className="text-xs font-medium text-orange-600">
+                      {calculateHelperPercentage(helperAllocations.trading).toFixed(1)}%
+                    </span>
+                  </div>
+                  <input
+                    type="number"
+                    value={helperAllocations.trading || ''}
+                    onChange={(e) => handleHelperAllocationChange('trading', parseFloat(e.target.value) || 0)}
+                    placeholder="0.00"
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                    min="0"
+                    step="0.01"
+                  />
+                </div>
+              </div>
+
+              {/* Summary */}
+              <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                <h4 className="text-sm font-semibold text-gray-700 mb-3">Summary</h4>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Total Allocated:</span>
+                    <span className="font-medium text-gray-900">
+                      CHF {(Object.values(helperAllocations).reduce((sum, val) => sum + val, 0)).toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm pt-2 border-t border-gray-300">
+                    <span className="text-gray-600 font-medium">Remaining:</span>
+                    <span className={`font-bold ${calculateHelperRemaining() >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      CHF {calculateHelperRemaining().toFixed(2)}
+                    </span>
+                  </div>
+                  {calculateHelperRemaining() < 0 && (
+                    <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700">
+                      ⚠️ Your allocations exceed your income!
+                    </div>
+                  )}
+                  {helperIncome > 0 && calculateHelperRemaining() >= 0 && (
+                    <div className="mt-2 text-xs text-gray-500">
+                      You're using {((1 - calculateHelperRemaining() / helperIncome) * 100).toFixed(1)}% of your income
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="px-6 py-4 border-t border-gray-200 flex justify-between">
+              <button
+                onClick={resetBudgetHelper}
+                className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors font-medium"
+              >
+                Reset
+              </button>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowBudgetHelper(false);
+                    resetBudgetHelper();
+                  }}
+                  className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleApplyHelperToMonthlyBudget}
+                  disabled={helperIncome <= 0}
+                  className="px-4 py-2 bg-gradient-to-r from-orange-500 to-pink-500 text-white rounded-lg font-medium hover:from-orange-600 hover:to-pink-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Apply to Budget
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

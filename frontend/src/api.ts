@@ -122,8 +122,50 @@ export const bulkDeleteBudgets = async (budgetIds: number[]): Promise<{ message:
 };
 
 // Categories
+export interface Category {
+  id: number;
+  name: string;
+  type: string;
+  is_active: boolean;
+  display_order: number;
+  created_at: string;
+}
+
+export interface CategoryCreate {
+  name: string;
+  type: string;
+  display_order?: number;
+}
+
+export interface CategoryUpdate {
+  name?: string;
+  type?: string;
+  is_active?: boolean;
+  display_order?: number;
+}
+
 export const getCategories = async (): Promise<CategoryInfo[]> => {
   const { data } = await api.get('/categories');
+  return data;
+};
+
+export const getAllCategories = async (): Promise<Category[]> => {
+  const { data } = await api.get('/categories/all');
+  return data;
+};
+
+export const createCategory = async (category: CategoryCreate): Promise<Category> => {
+  const { data } = await api.post('/categories', category);
+  return data;
+};
+
+export const updateCategory = async (id: number, update: CategoryUpdate): Promise<Category> => {
+  const { data } = await api.patch(`/categories/${id}`, update);
+  return data;
+};
+
+export const deleteCategory = async (id: number): Promise<{ message: string }> => {
+  const { data } = await api.delete(`/categories/${id}`);
   return data;
 };
 
