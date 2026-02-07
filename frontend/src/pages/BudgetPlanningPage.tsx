@@ -1,0 +1,587 @@
+import { useState, useEffect } from 'react';
+import { Calculator, Plus, Trash2, Save, DollarSign } from 'lucide-react';
+import type { BudgetPlan, CategoryInfo } from '../types';
+import * as api from '../api';
+
+interface BudgetRow {
+  type: string;
+  category: string;
+  yearlyAmount: number;
+  monthlyAmounts: Record<number, number>;
+  budgetIds: number[]; // Store all budget IDs for this row (yearly + monthly)
+}
+
+export default function BudgetPlanningPage() {
+  const [budgets, setBudgets] = useState<BudgetPlan[]>([]);
+  const [categories, setCategories] = useState<CategoryInfo[]>([]);
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  // Organized budget data
+  const [budgetRows, setBudgetRows] = useState<BudgetRow[]>([]);
+
+  // Selection for bulk delete
+  const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
+
+  // New budget form
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newBudget, setNewBudget] = useState({
+    type: 'Expenses',
+    category: '',
+    amount: 0,
+    isMonthly: false,
+  });
+
+  const months = [
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+  ];
+
+  useEffect(() => {
+    loadInitialData();
+  }, []);
+
+  useEffect(() => {
+    loadBudgets();
+  }, [selectedYear]);
+
+  const loadInitialData = async () => {
+    try {
+      const categoriesData = await api.getCategories();
+      setCategories(categoriesData);
+    } catch (error) {
+      console.error('Failed to load categories:', error);
+    }
+  };
+
+  const loadBudgets = async () => {
+    setLoading(true);
+    try {
+      const data = await api.getBudgets(selectedYear);
+      setBudgets(data);
+      organizeBudgets(data);
+    } catch (error) {
+      console.error('Failed to load budgets:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const organizeBudgets = (budgetData: BudgetPlan[]) => {
+    const rowMap = new Map<string, BudgetRow>();
+
+    budgetData.forEach((budget) => {
+      const key = `${budget.type}-${budget.category}`;
+      if (!rowMap.has(key)) {
+        rowMap.set(key, {
+          type: budget.type,
+          category: budget.category,
+          yearlyAmount: 0,
+          monthlyAmounts: {},
+          budgetIds: [],
+        });
+      }
+
+      const row = rowMap.get(key)!;
+      row.budgetIds.push(budget.id);
+      if (budget.month === null) {
+        row.yearlyAmount = budget.amount;
+      } else {
+        row.monthlyAmounts[budget.month] = budget.amount;
+      }
+    });
+
+    setBudgetRows(Array.from(rowMap.values()));
+  };
+
+  const getCategoriesForType = (type: string): string[] => {
+    const categoryInfo = categories.find((c) => c.type === type);
+    return categoryInfo?.categories || [];
+  };
+
+  const handleSaveBudget = async (
+    type: string,
+    category: string,
+    amount: number,
+    month?: number
+  ) => {
+    // Validate amount
+    if (isNaN(amount) || amount < 0) {
+      alert('Please enter a valid amount (0 or greater)');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await api.createBudget({
+        type,
+        category,
+        year: selectedYear,
+        month: month || null,
+        amount,
+      });
+      await loadBudgets();
+    } catch (error: any) {
+      console.error('Failed to save budget:', error);
+      const errorMsg = error?.response?.data?.detail || 'Failed to save budget. Please try again.';
+      alert(errorMsg);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleAddBudget = async () => {
+    if (!newBudget.category || newBudget.amount <= 0) {
+      alert('Please select a category and enter a valid amount');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      if (newBudget.isMonthly) {
+        // Create monthly budgets for all 12 months
+        for (let month = 1; month <= 12; month++) {
+          await api.createBudget({
+            type: newBudget.type,
+            category: newBudget.category,
+            year: selectedYear,
+            month,
+            amount: newBudget.amount,
+          });
+        }
+      } else {
+        // Create yearly budget
+        await api.createBudget({
+          type: newBudget.type,
+          category: newBudget.category,
+          year: selectedYear,
+          month: null,
+          amount: newBudget.amount,
+        });
+      }
+
+      setShowAddForm(false);
+      setNewBudget({ type: 'Expenses', category: '', amount: 0, isMonthly: false });
+      await loadBudgets();
+    } catch (error) {
+      console.error('Failed to add budget:', error);
+      alert('Failed to add budget');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteBudget = async (budgetId: number) => {
+    if (!confirm('Are you sure you want to delete this budget?')) return;
+
+    try {
+      await api.deleteBudget(budgetId);
+      await loadBudgets();
+    } catch (error) {
+      console.error('Failed to delete budget:', error);
+      alert('Failed to delete budget');
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedRows.size === 0) return;
+
+    const budgetIdsToDelete: number[] = [];
+    budgetRows.forEach((row) => {
+      const rowKey = `${row.type}-${row.category}`;
+      if (selectedRows.has(rowKey)) {
+        budgetIdsToDelete.push(...row.budgetIds);
+      }
+    });
+
+    if (!confirm(`Are you sure you want to delete ${selectedRows.size} budget line(s)? This will remove all associated yearly and monthly budgets.`)) {
+      return;
+    }
+
+    try {
+      await api.bulkDeleteBudgets(budgetIdsToDelete);
+      setSelectedRows(new Set());
+      await loadBudgets();
+    } catch (error) {
+      console.error('Failed to bulk delete budgets:', error);
+      alert('Failed to delete selected budgets');
+    }
+  };
+
+  const toggleRowSelection = (type: string, category: string) => {
+    const rowKey = `${type}-${category}`;
+    const newSelection = new Set(selectedRows);
+    if (newSelection.has(rowKey)) {
+      newSelection.delete(rowKey);
+    } else {
+      newSelection.add(rowKey);
+    }
+    setSelectedRows(newSelection);
+  };
+
+  const toggleAllInType = (type: string, rows: BudgetRow[]) => {
+    const newSelection = new Set(selectedRows);
+    const allSelected = rows.every((row) => selectedRows.has(`${row.type}-${row.category}`));
+
+    if (allSelected) {
+      // Deselect all in this type
+      rows.forEach((row) => newSelection.delete(`${row.type}-${row.category}`));
+    } else {
+      // Select all in this type
+      rows.forEach((row) => newSelection.add(`${row.type}-${row.category}`));
+    }
+
+    setSelectedRows(newSelection);
+  };
+
+  const formatAmount = (amount: number) => {
+    return new Intl.NumberFormat('de-CH', {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount);
+  };
+
+  const getTypeColor = (type: string) => {
+    switch (type) {
+      case 'Income':
+        return 'border-l-green-500 bg-green-50';
+      case 'Expenses':
+        return 'border-l-red-500 bg-red-50';
+      case 'Savings':
+        return 'border-l-blue-500 bg-blue-50';
+      default:
+        return 'border-l-gray-500 bg-gray-50';
+    }
+  };
+
+  const groupedRows = {
+    Income: budgetRows.filter((r) => r.type === 'Income'),
+    Expenses: budgetRows.filter((r) => r.type === 'Expenses'),
+    Savings: budgetRows.filter((r) => r.type === 'Savings'),
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-wrap gap-4 items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 flex items-center">
+            <Calculator className="w-6 h-6 mr-2 text-blue-600" />
+            Budget Planning
+          </h1>
+          <p className="text-gray-500 mt-1">
+            Set your yearly and monthly budgets for each category
+          </p>
+        </div>
+
+        <div className="flex items-center gap-4">
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Year</label>
+            <select
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(Number(e.target.value))}
+              className="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            >
+              {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() + i - 1).map((y) => (
+                <option key={y} value={y}>
+                  {y}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {selectedRows.size > 0 && (
+            <button
+              onClick={handleBulkDelete}
+              className="mt-5 px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 flex items-center"
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              Delete Selected ({selectedRows.size})
+            </button>
+          )}
+
+          <button
+            onClick={() => setShowAddForm(true)}
+            className="mt-5 px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 flex items-center"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Add Budget
+          </button>
+        </div>
+      </div>
+
+      {/* Add Budget Form */}
+      {showAddForm && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <h3 className="text-lg font-semibold mb-4">Add New Budget</h3>
+          <div className="grid md:grid-cols-4 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
+              <select
+                value={newBudget.type}
+                onChange={(e) =>
+                  setNewBudget({
+                    ...newBudget,
+                    type: e.target.value,
+                    category: getCategoriesForType(e.target.value)[0] || '',
+                  })
+                }
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              >
+                <option value="Income">Income</option>
+                <option value="Expenses">Expenses</option>
+                <option value="Savings">Savings</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+              <select
+                value={newBudget.category}
+                onChange={(e) => setNewBudget({ ...newBudget, category: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              >
+                <option value="">Select category</option>
+                {getCategoriesForType(newBudget.type).map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Amount (CHF)
+              </label>
+              <input
+                type="number"
+                value={newBudget.amount || ''}
+                onChange={(e) => setNewBudget({ ...newBudget, amount: Number(e.target.value) })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                placeholder="0"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
+              <div className="flex items-center gap-4 pt-2">
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    checked={!newBudget.isMonthly}
+                    onChange={() => setNewBudget({ ...newBudget, isMonthly: false })}
+                    className="mr-2"
+                  />
+                  Yearly
+                </label>
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    checked={newBudget.isMonthly}
+                    onChange={() => setNewBudget({ ...newBudget, isMonthly: true })}
+                    className="mr-2"
+                  />
+                  Monthly
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex gap-2 mt-4">
+            <button
+              onClick={handleAddBudget}
+              disabled={saving}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:bg-gray-300 flex items-center"
+            >
+              <Save className="w-4 h-4 mr-2" />
+              {saving ? 'Saving...' : 'Save Budget'}
+            </button>
+            <button
+              onClick={() => setShowAddForm(false)}
+              className="px-4 py-2 border border-gray-300 rounded-lg font-medium hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Budget Tables by Type */}
+      {loading ? (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center text-gray-500">
+          Loading budgets...
+        </div>
+      ) : (
+        Object.entries(groupedRows).map(([type, rows]) => (
+          <div key={type} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+            <div
+              className={`px-6 py-4 border-b border-gray-200 ${
+                type === 'Income'
+                  ? 'bg-green-50'
+                  : type === 'Expenses'
+                  ? 'bg-red-50'
+                  : 'bg-blue-50'
+              }`}
+            >
+              <h2 className="text-lg font-semibold text-gray-900 flex items-center">
+                <DollarSign className="w-5 h-5 mr-2" />
+                {type}
+              </h2>
+            </div>
+
+            {rows.length === 0 ? (
+              <div className="p-6 text-center text-gray-500">
+                No budgets set for {type}. Click "Add Budget" to create one.
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-2 py-3 text-center sticky left-0 bg-gray-50">
+                        <input
+                          type="checkbox"
+                          checked={rows.length > 0 && rows.every((row) => selectedRows.has(`${row.type}-${row.category}`))}
+                          onChange={() => toggleAllInType(type, rows)}
+                          className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                        />
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase sticky left-0 bg-gray-50">
+                        Category
+                      </th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                        Yearly
+                      </th>
+                      {months.map((month, i) => (
+                        <th
+                          key={i}
+                          className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase"
+                        >
+                          {month}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {rows.map((row, index) => (
+                      <tr key={index} className={`hover:bg-gray-50 border-l-4 ${getTypeColor(row.type)}`}>
+                        <td className="px-2 py-3 text-center sticky left-0 bg-white">
+                          <input
+                            type="checkbox"
+                            checked={selectedRows.has(`${row.type}-${row.category}`)}
+                            onChange={() => toggleRowSelection(row.type, row.category)}
+                            className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                          />
+                        </td>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900 sticky left-0 bg-white">
+                          {row.category}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-900 text-right">
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            defaultValue={row.yearlyAmount || ''}
+                            onBlur={(e) => {
+                              const inputValue = e.target.value.trim();
+                              // If empty, treat as 0
+                              const value = inputValue === '' ? 0 : Number(inputValue);
+                              // Only save if value changed and is valid
+                              if (!isNaN(value) && value !== row.yearlyAmount) {
+                                handleSaveBudget(row.type, row.category, value);
+                              }
+                            }}
+                            className="w-24 px-2 py-1 text-right border border-gray-200 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            placeholder="0"
+                          />
+                        </td>
+                        {months.map((_, monthIndex) => (
+                          <td key={monthIndex} className="px-3 py-3 text-sm text-gray-900 text-right">
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              defaultValue={row.monthlyAmounts[monthIndex + 1] || ''}
+                              onBlur={(e) => {
+                                const inputValue = e.target.value.trim();
+                                // If empty, treat as 0
+                                const value = inputValue === '' ? 0 : Number(inputValue);
+                                const currentValue = row.monthlyAmounts[monthIndex + 1] || 0;
+                                // Only save if value changed and is valid
+                                if (!isNaN(value) && value !== currentValue) {
+                                  handleSaveBudget(row.type, row.category, value, monthIndex + 1);
+                                }
+                              }}
+                              className="w-20 px-2 py-1 text-right border border-gray-200 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                              placeholder="0"
+                            />
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot className="bg-gray-100 font-medium">
+                    <tr>
+                      <td className="px-2 py-3 sticky left-0 bg-gray-100"></td>
+                      <td className="px-4 py-3 text-sm text-gray-900 sticky left-0 bg-gray-100">
+                        Total
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-900 text-right">
+                        {formatAmount(rows.reduce((sum, r) => sum + (r.yearlyAmount || 0), 0))}
+                      </td>
+                      {months.map((_, monthIndex) => (
+                        <td key={monthIndex} className="px-3 py-3 text-sm text-gray-900 text-right">
+                          {formatAmount(
+                            rows.reduce((sum, r) => sum + (r.monthlyAmounts[monthIndex + 1] || 0), 0)
+                          )}
+                        </td>
+                      ))}
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            )}
+          </div>
+        ))
+      )}
+
+      {/* Summary Card */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Budget Summary for {selectedYear}</h3>
+        <div className="grid md:grid-cols-4 gap-4">
+          <div className="p-4 bg-green-50 rounded-lg">
+            <p className="text-sm text-green-600 font-medium">Total Income Budget</p>
+            <p className="text-2xl font-bold text-green-700">
+              CHF {formatAmount(groupedRows.Income.reduce((sum, r) => sum + (r.yearlyAmount || 0), 0))}
+            </p>
+          </div>
+          <div className="p-4 bg-red-50 rounded-lg">
+            <p className="text-sm text-red-600 font-medium">Total Expenses Budget</p>
+            <p className="text-2xl font-bold text-red-700">
+              CHF {formatAmount(groupedRows.Expenses.reduce((sum, r) => sum + (r.yearlyAmount || 0), 0))}
+            </p>
+          </div>
+          <div className="p-4 bg-blue-50 rounded-lg">
+            <p className="text-sm text-blue-600 font-medium">Total Savings Budget</p>
+            <p className="text-2xl font-bold text-blue-700">
+              CHF {formatAmount(groupedRows.Savings.reduce((sum, r) => sum + (r.yearlyAmount || 0), 0))}
+            </p>
+          </div>
+          <div className="p-4 bg-purple-50 rounded-lg">
+            <p className="text-sm text-purple-600 font-medium">Net (Income - Expenses - Savings)</p>
+            <p className="text-2xl font-bold text-purple-700">
+              CHF{' '}
+              {formatAmount(
+                groupedRows.Income.reduce((sum, r) => sum + (r.yearlyAmount || 0), 0) -
+                  groupedRows.Expenses.reduce((sum, r) => sum + (r.yearlyAmount || 0), 0) -
+                  groupedRows.Savings.reduce((sum, r) => sum + (r.yearlyAmount || 0), 0)
+              )}
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

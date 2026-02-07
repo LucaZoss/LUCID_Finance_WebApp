@@ -1,0 +1,122 @@
+# ==============================================================================
+# LUCID Finance - .gitignore
+# ==============================================================================
+
+# Python-generated files
+# ----------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+wheels/
+.pytest_cache/
+.coverage
+htmlcov/
+*.cover
+.hypothesis/
+
+# Virtual environments
+# --------------------
+.venv/
+venv/
+ENV/
+env/
+.python-version
+
+# Environment & Secrets
+# ---------------------
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# Database & Data files
+# ---------------------
+*.db
+*.sqlite
+*.sqlite3
+output/
+raw_data/
+temp_uploads/
+Helpers/
+
+# Machine Learning Models
+# -----------------------
+model/models/*.pkl
+model/models/*.h5
+model/models/*.joblib
+model/models/*.pt
+model/models/*.pth
+!model/models/.gitkeep
+
+# Jupyter Notebooks
+# -----------------
+.ipynb_checkpoints/
+*.ipynb
+
+# Frontend
+# --------
+frontend/node_modules/
+frontend/dist/
+frontend/build/
+frontend/.vite/
+frontend/.turbo/
+*.tsbuildinfo
+
+# IDE & Editors
+# -------------
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+*.sublime-project
+*.sublime-workspace
+
+# OS-specific
+# -----------
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# Logs
+# ----
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Testing
+# -------
+.coverage
+.pytest_cache/
+coverage/
+test-results/
+
+# Documentation builds
+# --------------------
+docs/_build/
+site/
+
+# Temporary files
+# ---------------
+*.tmp
+*.bak
+*.backup
+~*
+
+# Claude Code
+# -----------
+.claude/
