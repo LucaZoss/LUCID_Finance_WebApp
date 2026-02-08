@@ -38,6 +38,13 @@ uv run python create_admin.py
 
 ### Create New Users (Admin Only)
 
+**to get bearer token**
+```bash
+curl -X POST http://localhost:8000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username": "luca", "password": "lucid-admin$"}'
+```
+
 **Via API:**
 ```bash
 curl -X POST http://localhost:8000/api/auth/users \
@@ -59,6 +66,20 @@ curl -X POST http://localhost:8000/api/auth/users \
 curl http://localhost:8000/api/auth/users \
   -H "Authorization: Bearer YOUR_TOKEN"
 ```
+
+---
+# Get token and save it
+TOKEN=$(curl -s -X POST http://localhost:8000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username": "luca", "password": "lucid-admin$"}' \
+  | grep -o '"access_token":"[^"]*"' \
+  | cut -d'"' -f4)
+
+# Use the token to check users
+curl http://localhost:8000/api/auth/users \
+  -H "Authorization: Bearer $TOKEN"
+
+
 
 ---
 
