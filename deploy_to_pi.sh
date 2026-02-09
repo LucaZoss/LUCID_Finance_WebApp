@@ -17,7 +17,7 @@ NC='\033[0m' # No Color
 PI_USER="luca"
 PI_HOST="lucid-pi.local"
 PI_DIR="/home/luca/LUCID_Finance_WebApp"
-REPO_URL="https://github.com/yourusername/LUCID_Finance_WebApp.git"  # Update this!
+REPO_URL="https://github.com/LucaZoss/LUCID_Finance_WebApp.git"
 
 echo -e "${GREEN}======================================${NC}"
 echo -e "${GREEN}LUCID Finance - Deploy to Raspberry Pi${NC}"
