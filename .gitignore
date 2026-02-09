@@ -40,10 +40,15 @@ env/
 *.db
 *.sqlite
 *.sqlite3
+*.sql
+backup_*.sql
+transfer_backup_*.sql
+temp_deploy_backup_*.sql
 output/
 raw_data/
 temp_uploads/
 Helpers/
+backups/
 
 # Machine Learning Models
 # -----------------------

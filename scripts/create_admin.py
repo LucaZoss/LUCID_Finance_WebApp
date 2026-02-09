@@ -1,15 +1,34 @@
 """Create initial admin user for LUCID Finance."""
 
+import getpass
 from backend.data_pipeline.models import DatabaseManager, User
 from backend.api.auth import get_password_hash
 
 
 def create_admin_user():
     """Create the initial admin user."""
-    # Admin credentials
-    admin_username = "luca"
-    admin_password = "lucid-admin$"
-    admin_fullname = "Luca Zosso"
+    print("=" * 60)
+    print("Create Admin User for LUCID Finance")
+    print("=" * 60)
+    print()
+
+    # Get admin credentials from user input
+    admin_username = input("Enter admin username [luca]: ").strip() or "luca"
+    admin_fullname = input("Enter full name [Luca Zosso]: ").strip() or "Luca Zosso"
+
+    # Get password with confirmation
+    while True:
+        admin_password = getpass.getpass("Enter admin password: ")
+        if len(admin_password) < 8:
+            print("❌ Password must be at least 8 characters long")
+            continue
+
+        password_confirm = getpass.getpass("Confirm password: ")
+        if admin_password == password_confirm:
+            break
+        print("❌ Passwords don't match. Try again.")
+
+    print()
 
     db_manager = DatabaseManager()
 
@@ -39,22 +58,20 @@ def create_admin_user():
         session.add(admin_user)
         session.commit()
 
+        print("=" * 60)
         print("✅ Admin user created successfully!")
-        print()
-        print("=" * 60)
-        print("  Login Credentials")
-        print("=" * 60)
-        print(f"  Username: {admin_username}")
-        print(f"  Password: {admin_password}")
         print("=" * 60)
         print()
-        print("⚠️  IMPORTANT: Change the password immediately after first login!")
+        print(f"  Username:  {admin_username}")
+        print(f"  Full Name: {admin_fullname}")
+        print("  Role:      Admin")
         print()
         print("You can now:")
         print("  1. Start the backend: ./start_backend.sh")
         print("  2. Start the frontend: ./start_frontend.sh")
         print("  3. Login at: http://localhost:5173")
         print("  4. Create additional users from the admin panel")
+        print()
 
     except Exception as e:
         session.rollback()
