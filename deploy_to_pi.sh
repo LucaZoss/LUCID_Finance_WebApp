@@ -104,9 +104,22 @@ fi
 echo -e "${GREEN}✓ Environment file ready${NC}"
 echo ""
 
+# Check and install uv if needed
+echo -e "${YELLOW}Checking for uv installation...${NC}"
+if ! ssh ${PI_USER}@${PI_HOST} "test -f \$HOME/.cargo/bin/uv"; then
+    echo "uv not found. Installing..."
+    ssh ${PI_USER}@${PI_HOST} "curl -LsSf https://astral.sh/uv/install.sh | sh"
+    echo -e "${GREEN}✓ uv installed${NC}"
+    echo "Waiting for installation to complete..."
+    sleep 2
+else
+    echo "uv already installed"
+fi
+echo ""
+
 # Install backend dependencies
 echo -e "${YELLOW}Installing backend dependencies...${NC}"
-ssh ${PI_USER}@${PI_HOST} "cd ${PI_DIR} && source \$HOME/.cargo/env && uv sync"
+ssh ${PI_USER}@${PI_HOST} "cd ${PI_DIR} && \$HOME/.cargo/bin/uv sync"
 echo -e "${GREEN}✓ Backend dependencies installed${NC}"
 echo ""
 
@@ -150,7 +163,7 @@ EOF
 else
     # Initialize categories if not transferring database
     echo -e "${YELLOW}Initializing categories...${NC}"
-    ssh ${PI_USER}@${PI_HOST} "cd ${PI_DIR} && source \$HOME/.cargo/env && uv run python scripts/initialize_categories.py --force"
+    ssh ${PI_USER}@${PI_HOST} "cd ${PI_DIR} && \$HOME/.cargo/bin/uv run python scripts/initialize_categories.py --force"
     echo -e "${GREEN}✓ Categories initialized${NC}"
     echo ""
 fi
