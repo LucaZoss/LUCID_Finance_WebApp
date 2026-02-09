@@ -106,7 +106,7 @@ echo ""
 
 # Check and install uv if needed
 echo -e "${YELLOW}Checking for uv installation...${NC}"
-if ! ssh ${PI_USER}@${PI_HOST} "test -f \$HOME/.cargo/bin/uv"; then
+if ! ssh ${PI_USER}@${PI_HOST} "test -f \$HOME/.local/bin/uv"; then
     echo "uv not found. Installing..."
     ssh ${PI_USER}@${PI_HOST} "curl -LsSf https://astral.sh/uv/install.sh | sh"
     echo -e "${GREEN}✓ uv installed${NC}"
@@ -119,7 +119,7 @@ echo ""
 
 # Install backend dependencies
 echo -e "${YELLOW}Installing backend dependencies...${NC}"
-ssh ${PI_USER}@${PI_HOST} "cd ${PI_DIR} && \$HOME/.cargo/bin/uv sync"
+ssh ${PI_USER}@${PI_HOST} "cd ${PI_DIR} && \$HOME/.local/bin/uv sync"
 echo -e "${GREEN}✓ Backend dependencies installed${NC}"
 echo ""
 
@@ -163,7 +163,7 @@ EOF
 else
     # Initialize categories if not transferring database
     echo -e "${YELLOW}Initializing categories...${NC}"
-    ssh ${PI_USER}@${PI_HOST} "cd ${PI_DIR} && \$HOME/.cargo/bin/uv run python scripts/initialize_categories.py --force"
+    ssh ${PI_USER}@${PI_HOST} "cd ${PI_DIR} && \$HOME/.local/bin/uv run python scripts/initialize_categories.py --force"
     echo -e "${GREEN}✓ Categories initialized${NC}"
     echo ""
 fi
@@ -180,9 +180,9 @@ Requires=docker.service
 Type=simple
 User=luca
 WorkingDirectory=/home/luca/LUCID_Finance_WebApp
-Environment="PATH=/home/luca/.cargo/bin:/home/luca/.local/bin:/usr/bin"
+Environment="PATH=/home/luca/.local/bin:/home/luca/.cargo/bin:/usr/bin"
 ExecStartPre=/bin/sleep 5
-ExecStart=/home/luca/.cargo/bin/uv run uvicorn backend.api.main:app --host 0.0.0.0 --port 8000
+ExecStart=/home/luca/.local/bin/uv run uvicorn backend.api.main:app --host 0.0.0.0 --port 8000
 Restart=always
 RestartSec=10
 
