@@ -106,7 +106,7 @@ echo ""
 
 # Install backend dependencies
 echo -e "${YELLOW}Installing backend dependencies...${NC}"
-ssh ${PI_USER}@${PI_HOST} "cd ${PI_DIR} && uv sync"
+ssh ${PI_USER}@${PI_HOST} "cd ${PI_DIR} && source \$HOME/.cargo/env && uv sync"
 echo -e "${GREEN}✓ Backend dependencies installed${NC}"
 echo ""
 
@@ -150,7 +150,7 @@ EOF
 else
     # Initialize categories if not transferring database
     echo -e "${YELLOW}Initializing categories...${NC}"
-    ssh ${PI_USER}@${PI_HOST} "cd ${PI_DIR} && uv run python scripts/initialize_categories.py --force"
+    ssh ${PI_USER}@${PI_HOST} "cd ${PI_DIR} && source \$HOME/.cargo/env && uv run python scripts/initialize_categories.py --force"
     echo -e "${GREEN}✓ Categories initialized${NC}"
     echo ""
 fi
