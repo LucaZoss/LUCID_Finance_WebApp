@@ -350,7 +350,8 @@ export default function DashboardPage() {
             <YAxis yAxisId="left" tickFormatter={formatShortAmount} />
             <YAxis yAxisId="right" orientation="right" tickFormatter={(value) => `${value.toFixed(0)}%`} />
             <Tooltip
-              formatter={(value: number, name: string) => {
+              formatter={(value: number | undefined, name: string) => {
+                if (value === undefined) return 'N/A';
                 if (name === 'Surplus Rate') {
                   return `${value.toFixed(1)}%`;
                 }
@@ -389,7 +390,7 @@ export default function DashboardPage() {
                 cx="50%"
                 cy="50%"
                 labelLine={false}
-                label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                label={({ name, percent }) => `${name}: ${((percent ?? 0) * 100).toFixed(0)}%`}
                 outerRadius={110}
                 fill="#8884d8"
                 dataKey="value"
@@ -398,7 +399,7 @@ export default function DashboardPage() {
                   <Cell key={`cell-${index}`} fill={entry.color} />
                 ))}
               </Pie>
-              <Tooltip formatter={(value: number) => formatAmount(value)} />
+              <Tooltip formatter={(value: number | undefined) => value !== undefined ? formatAmount(value) : 'N/A'} />
             </PieChart>
           </ResponsiveContainer>
         </div>
@@ -411,7 +412,7 @@ export default function DashboardPage() {
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis type="number" tickFormatter={formatShortAmount} />
               <YAxis dataKey="category" type="category" width={150} />
-              <Tooltip formatter={(value: number) => formatAmount(value)} />
+              <Tooltip formatter={(value: number | undefined) => value !== undefined ? formatAmount(value) : 'N/A'} />
               <Legend />
               <Bar dataKey="actual" fill={COLORS.expenses} name="Actual" />
               <Bar dataKey="budget" fill={COLORS.remaining} name="Budget" />

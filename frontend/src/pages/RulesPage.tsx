@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Filter, Plus, Trash2, Edit2, Save, X, ArrowUp, ArrowDown, RefreshCw } from 'lucide-react';
+import { Filter, Plus, Trash2, Save, X, ArrowUp, ArrowDown, RefreshCw } from 'lucide-react';
 import type { CategorizationRule, RuleCreate, RuleUpdate } from '../api';
 import type { CategoryInfo } from '../types';
 import * as api from '../api';
@@ -10,7 +10,7 @@ export default function RulesPage() {
   const [types, setTypes] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
-  const [editingRule, setEditingRule] = useState<CategorizationRule | null>(null);
+  const [_editingRule, setEditingRule] = useState<CategorizationRule | null>(null);
   const [applying, setApplying] = useState(false);
 
   // Form state

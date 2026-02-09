@@ -12,7 +12,7 @@ interface BudgetRow {
 }
 
 export default function BudgetPlanningPage() {
-  const [budgets, setBudgets] = useState<BudgetPlan[]>([]);
+  const [_budgets, setBudgets] = useState<BudgetPlan[]>([]);
   const [categories, setCategories] = useState<CategoryInfo[]>([]);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [loading, setLoading] = useState(true);
@@ -361,18 +361,6 @@ export default function BudgetPlanningPage() {
     }
   };
 
-  const handleDeleteBudget = async (budgetId: number) => {
-    if (!confirm('Are you sure you want to delete this budget?')) return;
-
-    try {
-      await api.deleteBudget(budgetId);
-      await loadBudgets();
-    } catch (error) {
-      console.error('Failed to delete budget:', error);
-      alert('Failed to delete budget');
-    }
-  };
-
   const handleBulkDelete = async () => {
     if (selectedRows.size === 0) return;
 
@@ -409,7 +397,7 @@ export default function BudgetPlanningPage() {
     setSelectedRows(newSelection);
   };
 
-  const toggleAllInType = (type: string, rows: BudgetRow[]) => {
+  const toggleAllInType = (_type: string, rows: BudgetRow[]) => {
     const newSelection = new Set(selectedRows);
     const allSelected = rows.every((row) => selectedRows.has(`${row.type}-${row.category}`));
 
