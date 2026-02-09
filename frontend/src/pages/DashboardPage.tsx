@@ -350,7 +350,7 @@ export default function DashboardPage() {
             <YAxis yAxisId="left" tickFormatter={formatShortAmount} />
             <YAxis yAxisId="right" orientation="right" tickFormatter={(value) => `${value.toFixed(0)}%`} />
             <Tooltip
-              formatter={(value: number | undefined, name: string) => {
+              formatter={(value: number | undefined, name: string | undefined) => {
                 if (value === undefined) return 'N/A';
                 if (name === 'Surplus Rate') {
                   return `${value.toFixed(1)}%`;
