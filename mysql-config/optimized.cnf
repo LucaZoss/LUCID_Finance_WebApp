@@ -1,0 +1,40 @@
+[mysqld]
+# ====================
+# SD Card Optimizations for Raspberry Pi
+# ====================
+
+# Reduce binary logging (you don't need replication)
+skip-log-bin
+
+# Disable general query log (only use for debugging)
+general_log = 0
+
+# Keep slow query log but with higher threshold
+slow_query_log = 1
+long_query_time = 5
+
+# InnoDB optimizations for SD card
+innodb_flush_log_at_trx_commit = 2  # Flush every second instead of every transaction
+innodb_flush_method = O_DIRECT      # Bypass OS cache
+innodb_io_capacity = 200            # Lower for SD card (default is 200)
+innodb_io_capacity_max = 400        # Max burst writes
+
+# Buffer pool (adjust based on your Pi's RAM - this is for 4GB+ Pi)
+innodb_buffer_pool_size = 256M      # Cache frequently used data in RAM
+
+# Reduce write frequency
+innodb_log_file_size = 64M
+innodb_log_buffer_size = 16M
+
+# Reduce checkpoint frequency
+innodb_flush_neighbors = 0          # Good for SSDs/SD cards (random access)
+
+# Connection limits (your app doesn't need many)
+max_connections = 50
+
+# Temp tables in RAM when possible
+tmp_table_size = 32M
+max_heap_table_size = 32M
+
+# Reduce monitoring overhead
+performance_schema = OFF
