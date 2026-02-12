@@ -24,7 +24,7 @@ from sqlalchemy import text
 from backend.data_pipeline.models import DatabaseManager, User
 
 
-def run_migration():
+def run_migration(skip_confirmation=False):
     """Run the user isolation migration."""
     print("=" * 70)
     print("Database Migration: Add User Isolation")
@@ -53,10 +53,11 @@ def run_migration():
         print()
 
         # Confirm before proceeding
-        response = input("Do you want to proceed with the migration? (yes/no): ").strip().lower()
-        if response != 'yes':
-            print("Migration cancelled.")
-            return False
+        if not skip_confirmation:
+            response = input("Do you want to proceed with the migration? (yes/no): ").strip().lower()
+            if response != 'yes':
+                print("Migration cancelled.")
+                return False
 
         print()
         print("Starting migration...")
@@ -266,5 +267,7 @@ def run_migration():
 
 
 if __name__ == "__main__":
-    success = run_migration()
+    # Check for --yes flag to skip confirmation
+    skip_confirmation = "--yes" in sys.argv or "-y" in sys.argv
+    success = run_migration(skip_confirmation=skip_confirmation)
     sys.exit(0 if success else 1)
