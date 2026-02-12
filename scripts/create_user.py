@@ -2,6 +2,12 @@
 
 import getpass
 import sys
+from pathlib import Path
+
+# Add project root to Python path
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root))
+
 from backend.data_pipeline.models import DatabaseManager, User
 from backend.api.auth import get_password_hash
 
