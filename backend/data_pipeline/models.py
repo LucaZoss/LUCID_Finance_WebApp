@@ -15,6 +15,7 @@ from sqlalchemy import (
     Boolean,
     Index,
     UniqueConstraint,
+    ForeignKey,
     create_engine,
 )
 from sqlalchemy.orm import declarative_base, sessionmaker, Session
@@ -35,6 +36,7 @@ class Transaction(Base):
     __tablename__ = "transactions"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
 
     # Core transaction data
     date = Column(Date, nullable=False, index=True)
@@ -54,12 +56,14 @@ class Transaction(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     source_file = Column(String(255), nullable=True)  # Which file this came from
 
-    # Hash for deduplication
-    transaction_hash = Column(String(64), nullable=False, unique=True)
+    # Hash for deduplication (per-user unique)
+    transaction_hash = Column(String(64), nullable=False)
 
     __table_args__ = (
         Index("idx_year_month", "year", "month"),
         Index("idx_type_category", "type", "category"),
+        Index("idx_user_date", "user_id", "date"),
+        UniqueConstraint("user_id", "transaction_hash", name="uq_user_transaction_hash"),
     )
 
     def __repr__(self) -> str:
@@ -95,12 +99,13 @@ class ProcessedFile(Base):
     __tablename__ = "processed_files"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    filename = Column(String(255), nullable=False, unique=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    filename = Column(String(255), nullable=False)
     file_type = Column(String(20), nullable=False)  # 'UBS' or 'CC'
     processed_at = Column(DateTime, default=datetime.utcnow)
     record_count = Column(Integer, nullable=True)  # Number of transactions extracted
 
-    __table_args__ = (UniqueConstraint("filename", name="uq_filename"),)
+    __table_args__ = (UniqueConstraint("user_id", "filename", name="uq_user_filename"),)
 
     def __repr__(self) -> str:
         return f"<ProcessedFile(filename={self.filename}, processed_at={self.processed_at})>"
@@ -116,6 +121,7 @@ class BudgetPlan(Base):
     __tablename__ = "budget_plans"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     year = Column(Integer, nullable=False)
     month = Column(Integer, nullable=True)  # 1-12, NULL for yearly budgets
     type = Column(String(50), nullable=False)  # Income, Expenses, Savings
@@ -126,8 +132,9 @@ class BudgetPlan(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     __table_args__ = (
-        UniqueConstraint("year", "month", "type", "category", name="uq_budget_plan"),
+        UniqueConstraint("user_id", "year", "month", "type", "category", name="uq_user_budget_plan"),
         Index("idx_budget_year_month", "year", "month"),
+        Index("idx_budget_user", "user_id"),
     )
 
     def __repr__(self) -> str:
@@ -147,12 +154,18 @@ class Category(Base):
     __tablename__ = "categories"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    name = Column(String(100), nullable=False, unique=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    name = Column(String(100), nullable=False)
     type = Column(String(50), nullable=False)  # Income, Expenses, Savings
     is_active = Column(Boolean, default=True)
     display_order = Column(Integer, default=0)
 
     created_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "name", name="uq_user_category_name"),
+        Index("idx_category_user", "user_id"),
+    )
 
     def __repr__(self) -> str:
         return f"<Category(name={self.name}, type={self.type})>"

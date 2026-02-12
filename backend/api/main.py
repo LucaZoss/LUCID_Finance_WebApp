@@ -233,7 +233,7 @@ def login(credentials: LoginRequest):
         )
 
     access_token = create_access_token(
-        data={"sub": user["username"], "is_admin": user["is_admin"]}
+        data={"sub": user["username"], "user_id": user["id"], "is_admin": user["is_admin"]}
     )
 
     return LoginResponse(
@@ -440,8 +440,10 @@ def apply_rules_to_transactions(
         if not rules:
             return {"message": "No active rules to apply", "updated_count": 0}
 
-        # Get all transactions
-        transactions = session.query(Transaction).all()
+        # Get all transactions for current user
+        transactions = session.query(Transaction).filter(
+            Transaction.user_id == current_user["id"]
+        ).all()
 
         if not transactions:
             return {"message": "No transactions to process", "updated_count": 0}
@@ -500,7 +502,8 @@ def get_transactions(
     """Get transactions with optional filters."""
     session = db_manager.get_session()
     try:
-        query = session.query(Transaction)
+        # Filter by current user
+        query = session.query(Transaction).filter(Transaction.user_id == current_user["id"])
 
         if year:
             query = query.filter(Transaction.year == year)
@@ -524,11 +527,14 @@ def get_transactions(
 
 
 @app.get("/api/transactions/{transaction_id}", response_model=TransactionResponse)
-def get_transaction(transaction_id: int):
+def get_transaction(transaction_id: int, current_user: dict = Depends(get_current_user)):
     """Get a single transaction by ID."""
     session = db_manager.get_session()
     try:
-        transaction = session.query(Transaction).filter(Transaction.id == transaction_id).first()
+        transaction = session.query(Transaction).filter(
+            Transaction.id == transaction_id,
+            Transaction.user_id == current_user["id"]
+        ).first()
         if not transaction:
             raise HTTPException(status_code=404, detail="Transaction not found")
         return TransactionResponse.model_validate(transaction)
@@ -537,11 +543,14 @@ def get_transaction(transaction_id: int):
 
 
 @app.patch("/api/transactions/{transaction_id}", response_model=TransactionResponse)
-def update_transaction(transaction_id: int, update: TransactionUpdate):
+def update_transaction(transaction_id: int, update: TransactionUpdate, current_user: dict = Depends(get_current_user)):
     """Update a transaction's type and/or category."""
     session = db_manager.get_session()
     try:
-        transaction = session.query(Transaction).filter(Transaction.id == transaction_id).first()
+        transaction = session.query(Transaction).filter(
+            Transaction.id == transaction_id,
+            Transaction.user_id == current_user["id"]
+        ).first()
         if not transaction:
             raise HTTPException(status_code=404, detail="Transaction not found")
 
@@ -561,11 +570,14 @@ def update_transaction(transaction_id: int, update: TransactionUpdate):
 
 
 @app.delete("/api/transactions/{transaction_id}")
-def delete_transaction(transaction_id: int):
+def delete_transaction(transaction_id: int, current_user: dict = Depends(get_current_user)):
     """Delete a transaction."""
     session = db_manager.get_session()
     try:
-        transaction = session.query(Transaction).filter(Transaction.id == transaction_id).first()
+        transaction = session.query(Transaction).filter(
+            Transaction.id == transaction_id,
+            Transaction.user_id == current_user["id"]
+        ).first()
         if not transaction:
             raise HTTPException(status_code=404, detail="Transaction not found")
 
@@ -580,7 +592,7 @@ def delete_transaction(transaction_id: int):
 
 
 @app.post("/api/transactions/bulk-update")
-def bulk_update_transactions(updates: dict):
+def bulk_update_transactions(updates: dict, current_user: dict = Depends(get_current_user)):
     """Bulk update transactions by criteria (e.g., reclassify all matching transactions)."""
     session = db_manager.get_session()
     try:
@@ -595,7 +607,8 @@ def bulk_update_transactions(updates: dict):
         if not new_type and not new_category:
             raise HTTPException(status_code=400, detail="Must provide updates")
 
-        query = session.query(Transaction)
+        # Filter by current user
+        query = session.query(Transaction).filter(Transaction.user_id == current_user["id"])
         if description_filter:
             query = query.filter(Transaction.description.ilike(f"%{description_filter}%"))
         if category_filter:
@@ -678,11 +691,11 @@ async def upload_csv(
 # ============== Budget Endpoints ==============
 
 @app.get("/api/budgets", response_model=List[BudgetPlanResponse])
-def get_budgets(year: Optional[int] = None):
+def get_budgets(year: Optional[int] = None, current_user: dict = Depends(get_current_user)):
     """Get all budget plans, optionally filtered by year."""
     session = db_manager.get_session()
     try:
-        query = session.query(BudgetPlan)
+        query = session.query(BudgetPlan).filter(BudgetPlan.user_id == current_user["id"])
         if year:
             query = query.filter(BudgetPlan.year == year)
         budgets = query.all()
@@ -692,12 +705,13 @@ def get_budgets(year: Optional[int] = None):
 
 
 @app.post("/api/budgets", response_model=BudgetPlanResponse)
-def create_budget(budget: BudgetPlanCreate, auto_populate: bool = True):
+def create_budget(budget: BudgetPlanCreate, auto_populate: bool = True, current_user: dict = Depends(get_current_user)):
     """Create or update a budget plan with optional auto-population."""
     session = db_manager.get_session()
     try:
-        # Check if budget already exists
+        # Check if budget already exists for current user
         existing = session.query(BudgetPlan).filter(
+            BudgetPlan.user_id == current_user["id"],
             BudgetPlan.type == budget.type,
             BudgetPlan.category == budget.category,
             BudgetPlan.year == budget.year,
@@ -708,6 +722,7 @@ def create_budget(budget: BudgetPlanCreate, auto_populate: bool = True):
             existing.amount = Decimal(str(budget.amount))
         else:
             existing = BudgetPlan(
+                user_id=current_user["id"],
                 type=budget.type,
                 category=budget.category,
                 year=budget.year,
@@ -726,6 +741,7 @@ def create_budget(budget: BudgetPlanCreate, auto_populate: bool = True):
                 monthly_amount = Decimal(str(budget.amount)) / 12
                 for month_num in range(1, 13):
                     monthly_budget = session.query(BudgetPlan).filter(
+                        BudgetPlan.user_id == current_user["id"],
                         BudgetPlan.type == budget.type,
                         BudgetPlan.category == budget.category,
                         BudgetPlan.year == budget.year,
@@ -736,6 +752,7 @@ def create_budget(budget: BudgetPlanCreate, auto_populate: bool = True):
                         monthly_budget.amount = monthly_amount
                     else:
                         monthly_budget = BudgetPlan(
+                            user_id=current_user["id"],
                             type=budget.type,
                             category=budget.category,
                             year=budget.year,
@@ -746,6 +763,7 @@ def create_budget(budget: BudgetPlanCreate, auto_populate: bool = True):
             else:
                 # Monthly budget entered → update yearly budget (sum all months)
                 all_monthly = session.query(BudgetPlan).filter(
+                    BudgetPlan.user_id == current_user["id"],
                     BudgetPlan.type == budget.type,
                     BudgetPlan.category == budget.category,
                     BudgetPlan.year == budget.year,
@@ -756,6 +774,7 @@ def create_budget(budget: BudgetPlanCreate, auto_populate: bool = True):
                     # All 12 months exist, calculate yearly total
                     yearly_total = sum(Decimal(str(b.amount)) for b in all_monthly)
                     yearly_budget = session.query(BudgetPlan).filter(
+                        BudgetPlan.user_id == current_user["id"],
                         BudgetPlan.type == budget.type,
                         BudgetPlan.category == budget.category,
                         BudgetPlan.year == budget.year,
@@ -766,6 +785,7 @@ def create_budget(budget: BudgetPlanCreate, auto_populate: bool = True):
                         yearly_budget.amount = yearly_total
                     else:
                         yearly_budget = BudgetPlan(
+                            user_id=current_user["id"],
                             type=budget.type,
                             category=budget.category,
                             year=budget.year,
@@ -786,11 +806,14 @@ def create_budget(budget: BudgetPlanCreate, auto_populate: bool = True):
 
 
 @app.delete("/api/budgets/{budget_id}")
-def delete_budget(budget_id: int):
+def delete_budget(budget_id: int, current_user: dict = Depends(get_current_user)):
     """Delete a budget plan."""
     session = db_manager.get_session()
     try:
-        budget = session.query(BudgetPlan).filter(BudgetPlan.id == budget_id).first()
+        budget = session.query(BudgetPlan).filter(
+            BudgetPlan.id == budget_id,
+            BudgetPlan.user_id == current_user["id"]
+        ).first()
         if not budget:
             raise HTTPException(status_code=404, detail="Budget not found")
 
@@ -805,12 +828,13 @@ def delete_budget(budget_id: int):
 
 
 @app.post("/api/budgets/bulk-delete")
-def bulk_delete_budgets(budget_ids: List[int]):
+def bulk_delete_budgets(budget_ids: List[int], current_user: dict = Depends(get_current_user)):
     """Delete multiple budget plans at once."""
     session = db_manager.get_session()
     try:
         deleted_count = session.query(BudgetPlan).filter(
-            BudgetPlan.id.in_(budget_ids)
+            BudgetPlan.id.in_(budget_ids),
+            BudgetPlan.user_id == current_user["id"]
         ).delete(synchronize_session=False)
 
         session.commit()
@@ -825,12 +849,15 @@ def bulk_delete_budgets(budget_ids: List[int]):
 # ============== Category Endpoints ==============
 
 @app.get("/api/categories", response_model=List[CategoryInfo])
-def get_categories():
+def get_categories(current_user: dict = Depends(get_current_user)):
     """Get all available categories grouped by type."""
     session = db_manager.get_session()
     try:
-        # Get categories from database
-        categories_db = session.query(Category).filter(Category.is_active.is_(True)).order_by(Category.display_order, Category.name).all()
+        # Get categories from database for current user
+        categories_db = session.query(Category).filter(
+            Category.user_id == current_user["id"],
+            Category.is_active.is_(True)
+        ).order_by(Category.display_order, Category.name).all()
 
         # If no categories in DB, use config defaults
         if not categories_db:
@@ -857,7 +884,9 @@ def get_all_categories(current_user: dict = Depends(get_current_user)):
     """Get all categories (including inactive) for management."""
     session = db_manager.get_session()
     try:
-        categories = session.query(Category).order_by(Category.type, Category.display_order, Category.name).all()
+        categories = session.query(Category).filter(
+            Category.user_id == current_user["id"]
+        ).order_by(Category.type, Category.display_order, Category.name).all()
         return [CategoryResponse.model_validate(cat) for cat in categories]
     finally:
         session.close()
@@ -868,8 +897,9 @@ def create_category(category: CategoryCreate, current_user: dict = Depends(get_c
     """Create a new category."""
     session = db_manager.get_session()
     try:
-        # Check if category already exists
+        # Check if category already exists for this user
         existing = session.query(Category).filter(
+            Category.user_id == current_user["id"],
             Category.name == category.name,
             Category.type == category.type
         ).first()
@@ -882,6 +912,7 @@ def create_category(category: CategoryCreate, current_user: dict = Depends(get_c
 
         # Create new category
         new_category = Category(
+            user_id=current_user["id"],
             name=category.name,
             type=category.type,
             display_order=category.display_order,
@@ -912,15 +943,19 @@ def update_category(
     """Update an existing category."""
     session = db_manager.get_session()
     try:
-        category = session.query(Category).filter(Category.id == category_id).first()
+        category = session.query(Category).filter(
+            Category.id == category_id,
+            Category.user_id == current_user["id"]
+        ).first()
 
         if not category:
             raise HTTPException(status_code=404, detail="Category not found")
 
         # Update fields
         if update.name is not None:
-            # Check for duplicate name
+            # Check for duplicate name within user's categories
             existing = session.query(Category).filter(
+                Category.user_id == current_user["id"],
                 Category.name == update.name,
                 Category.type == (update.type if update.type else category.type),
                 Category.id != category_id
@@ -962,17 +997,22 @@ def delete_category(category_id: int, current_user: dict = Depends(get_current_u
     """Delete a category (soft delete by setting is_active=False)."""
     session = db_manager.get_session()
     try:
-        category = session.query(Category).filter(Category.id == category_id).first()
+        category = session.query(Category).filter(
+            Category.id == category_id,
+            Category.user_id == current_user["id"]
+        ).first()
 
         if not category:
             raise HTTPException(status_code=404, detail="Category not found")
 
-        # Check if category is used in transactions or budgets
+        # Check if category is used in user's transactions or budgets
         transaction_count = session.query(func.count(Transaction.id)).filter(
+            Transaction.user_id == current_user["id"],
             Transaction.category == category.name
         ).scalar()
 
         budget_count = session.query(func.count(BudgetPlan.id)).filter(
+            BudgetPlan.user_id == current_user["id"],
             BudgetPlan.category == category.name
         ).scalar()
 
@@ -1007,16 +1047,19 @@ def get_types():
 # ============== Dashboard Endpoints ==============
 
 @app.get("/api/dashboard/summary", response_model=DashboardSummary)
-def get_dashboard_summary(year: int, month: Optional[int] = None):
+def get_dashboard_summary(year: int, month: Optional[int] = None, current_user: dict = Depends(get_current_user)):
     """Get budget vs actual summary for dashboard."""
     session = db_manager.get_session()
     try:
-        # Get actual spending from transactions
+        # Get actual spending from transactions for current user
         actual_query = session.query(
             Transaction.type,
             Transaction.category,
             func.sum(Transaction.amount).label("total"),
-        ).filter(Transaction.year == year)
+        ).filter(
+            Transaction.user_id == current_user["id"],
+            Transaction.year == year
+        )
 
         if month:
             actual_query = actual_query.filter(Transaction.month == month)
@@ -1027,7 +1070,10 @@ def get_dashboard_summary(year: int, month: Optional[int] = None):
         # Get budgets - aggregate monthly budgets if viewing full year
         if month:
             # For a specific month: get that month's budget OR yearly budget (divided by 12)
-            budget_query = session.query(BudgetPlan).filter(BudgetPlan.year == year)
+            budget_query = session.query(BudgetPlan).filter(
+                BudgetPlan.user_id == current_user["id"],
+                BudgetPlan.year == year
+            )
             budget_query = budget_query.filter(
                 (BudgetPlan.month == month) | (BudgetPlan.month.is_(None))
             )
@@ -1043,7 +1089,10 @@ def get_dashboard_summary(year: int, month: Optional[int] = None):
                     budgets[key] = float(b.amount)
         else:
             # For full year: sum all monthly budgets OR use yearly budget
-            all_budgets = session.query(BudgetPlan).filter(BudgetPlan.year == year).all()
+            all_budgets = session.query(BudgetPlan).filter(
+                BudgetPlan.user_id == current_user["id"],
+                BudgetPlan.year == year
+            ).all()
 
             budgets = {}
             yearly_budgets = {}  # Track yearly budgets
@@ -1136,7 +1185,7 @@ def get_dashboard_summary(year: int, month: Optional[int] = None):
 
 
 @app.get("/api/dashboard/monthly-trend")
-def get_monthly_trend(year: int, categories: Optional[str] = None):
+def get_monthly_trend(year: int, categories: Optional[str] = None, current_user: dict = Depends(get_current_user)):
     """Get monthly spending trend for the year, optionally filtered by categories (comma-separated)."""
     session = db_manager.get_session()
     try:
@@ -1145,6 +1194,7 @@ def get_monthly_trend(year: int, categories: Optional[str] = None):
             Transaction.type,
             func.sum(Transaction.amount).label("total"),
         ).filter(
+            Transaction.user_id == current_user["id"],
             Transaction.year == year
         )
 
@@ -1172,11 +1222,13 @@ def get_monthly_trend(year: int, categories: Optional[str] = None):
 
 
 @app.get("/api/years")
-def get_available_years():
+def get_available_years(current_user: dict = Depends(get_current_user)):
     """Get list of years with transaction data."""
     session = db_manager.get_session()
     try:
-        years = session.query(Transaction.year).distinct().order_by(Transaction.year.desc()).all()
+        years = session.query(Transaction.year).filter(
+            Transaction.user_id == current_user["id"]
+        ).distinct().order_by(Transaction.year.desc()).all()
         return [y[0] for y in years]
     finally:
         session.close()
@@ -1225,20 +1277,26 @@ def export_to_excel(
             cell.alignment = header_alignment
             cell.border = border
 
-        # Get budget data
-        budget_query = session.query(BudgetPlan).filter(BudgetPlan.year == year)
+        # Get budget data for current user
+        budget_query = session.query(BudgetPlan).filter(
+            BudgetPlan.user_id == current_user["id"],
+            BudgetPlan.year == year
+        )
         if month:
             budget_query = budget_query.filter(BudgetPlan.month == month)
         else:
             budget_query = budget_query.filter(BudgetPlan.month.is_(None))
         budgets = budget_query.all()
 
-        # Get actual transactions
+        # Get actual transactions for current user
         trans_query = session.query(
             Transaction.type,
             Transaction.category,
             func.sum(Transaction.amount).label("total")
-        ).filter(Transaction.year == year)
+        ).filter(
+            Transaction.user_id == current_user["id"],
+            Transaction.year == year
+        )
 
         if month:
             trans_query = trans_query.filter(Transaction.month == month)
@@ -1358,8 +1416,11 @@ def export_to_excel(
             cell.alignment = header_alignment
             cell.border = border
 
-        # Get transactions
-        transactions_query = session.query(Transaction).filter(Transaction.year == year)
+        # Get transactions for current user
+        transactions_query = session.query(Transaction).filter(
+            Transaction.user_id == current_user["id"],
+            Transaction.year == year
+        )
         if month:
             transactions_query = transactions_query.filter(Transaction.month == month)
         transactions = transactions_query.order_by(Transaction.date.desc()).all()

@@ -76,13 +76,19 @@ def get_current_user(
     payload = decode_token(token)
 
     username: str = payload.get("sub")
-    if username is None:
+    user_id: int = payload.get("user_id")
+
+    if username is None or user_id is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Could not validate credentials",
         )
 
-    return {"username": username, "is_admin": payload.get("is_admin", False)}
+    return {
+        "id": user_id,
+        "username": username,
+        "is_admin": payload.get("is_admin", False)
+    }
 
 
 def get_admin_user(current_user: dict = Depends(get_current_user)) -> dict:
