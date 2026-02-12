@@ -50,7 +50,12 @@ def run_migration(skip_confirmation=False):
             return False
 
         print(f"Admin user found: {admin_user.username} (ID: {admin_user.id})")
+        admin_user_id = admin_user.id
+        admin_username = admin_user.username
         print()
+
+        # Close session before starting engine work to avoid locks
+        session.close()
 
         # Confirm before proceeding
         if not skip_confirmation:
@@ -79,9 +84,9 @@ def run_migration(skip_confirmation=False):
                     raise
 
             conn.execute(
-                text(f"UPDATE transactions SET user_id = {admin_user.id} WHERE user_id IS NULL")
+                text(f"UPDATE transactions SET user_id = {admin_user_id} WHERE user_id IS NULL")
             )
-            print(f"   ✓ Assigned all transactions to {admin_user.username}")
+            print(f"   ✓ Assigned all transactions to {admin_username}")
 
             conn.execute(text("ALTER TABLE transactions MODIFY user_id INTEGER NOT NULL"))
             print("   ✓ Made user_id NOT NULL")
@@ -120,9 +125,9 @@ def run_migration(skip_confirmation=False):
                     raise
 
             conn.execute(
-                text(f"UPDATE budget_plans SET user_id = {admin_user.id} WHERE user_id IS NULL")
+                text(f"UPDATE budget_plans SET user_id = {admin_user_id} WHERE user_id IS NULL")
             )
-            print(f"   ✓ Assigned all budget plans to {admin_user.username}")
+            print(f"   ✓ Assigned all budget plans to {admin_username}")
 
             conn.execute(text("ALTER TABLE budget_plans MODIFY user_id INTEGER NOT NULL"))
             print("   ✓ Made user_id NOT NULL")
@@ -161,9 +166,9 @@ def run_migration(skip_confirmation=False):
                     raise
 
             conn.execute(
-                text(f"UPDATE processed_files SET user_id = {admin_user.id} WHERE user_id IS NULL")
+                text(f"UPDATE processed_files SET user_id = {admin_user_id} WHERE user_id IS NULL")
             )
-            print(f"   ✓ Assigned all processed files to {admin_user.username}")
+            print(f"   ✓ Assigned all processed files to {admin_username}")
 
             conn.execute(text("ALTER TABLE processed_files MODIFY user_id INTEGER NOT NULL"))
             print("   ✓ Made user_id NOT NULL")
@@ -202,9 +207,9 @@ def run_migration(skip_confirmation=False):
                     raise
 
             conn.execute(
-                text(f"UPDATE categories SET user_id = {admin_user.id} WHERE user_id IS NULL")
+                text(f"UPDATE categories SET user_id = {admin_user_id} WHERE user_id IS NULL")
             )
-            print(f"   ✓ Assigned all categories to {admin_user.username}")
+            print(f"   ✓ Assigned all categories to {admin_username}")
 
             conn.execute(text("ALTER TABLE categories MODIFY user_id INTEGER NOT NULL"))
             print("   ✓ Made user_id NOT NULL")
@@ -240,7 +245,7 @@ def run_migration(skip_confirmation=False):
         print("=" * 70)
         print()
         print("Summary:")
-        print(f"  - All data assigned to: {admin_user.username} (ID: {admin_user.id})")
+        print(f"  - All data assigned to: {admin_username} (ID: {admin_user_id})")
         print("  - Added user_id to: transactions, budget_plans, processed_files, categories")
         print("  - Added foreign keys and indexes")
         print()
@@ -253,7 +258,6 @@ def run_migration(skip_confirmation=False):
         return True
 
     except Exception as e:
-        session.rollback()
         print()
         print("=" * 70)
         print("❌ Migration failed!")
@@ -262,8 +266,6 @@ def run_migration(skip_confirmation=False):
         print()
         print("The database has been rolled back to its previous state.")
         return False
-    finally:
-        session.close()
 
 
 if __name__ == "__main__":
