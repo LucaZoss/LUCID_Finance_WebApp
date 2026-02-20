@@ -144,7 +144,6 @@ export default function DashboardPage() {
   }));
 
   const netActual = summary.totals.net.actual;
-  const netBudget = summary.totals.net.budget;
   const isPositiveNet = netActual >= 0;
 
   return (
