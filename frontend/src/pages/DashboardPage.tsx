@@ -25,6 +25,7 @@ export default function DashboardPage() {
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [years, setYears] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
+  const [initialFiltersSet, setInitialFiltersSet] = useState(false);
 
   const months = [
     'January', 'February', 'March', 'April', 'May', 'June',
@@ -40,11 +41,35 @@ export default function DashboardPage() {
 
   useEffect(() => {
     loadYears();
+    initializeFilters();
   }, []);
 
   useEffect(() => {
-    loadDashboardData();
-  }, [selectedYear, selectedMonth, selectedCategories]);
+    if (initialFiltersSet) {
+      loadDashboardData();
+    }
+  }, [selectedYear, selectedMonth, selectedCategories, initialFiltersSet]);
+
+  const initializeFilters = async () => {
+    try {
+      // Fetch summary for current year to get latest transaction date
+      const summaryData = await api.getDashboardSummary(new Date().getFullYear());
+
+      if (summaryData.latest_transaction_date) {
+        const latestDate = new Date(summaryData.latest_transaction_date);
+        const year = latestDate.getFullYear();
+        const month = latestDate.getMonth() + 1; // getMonth() returns 0-11
+
+        setSelectedYear(year);
+        setSelectedMonth(month);
+      }
+
+      setInitialFiltersSet(true);
+    } catch (error) {
+      console.error('Failed to initialize filters:', error);
+      setInitialFiltersSet(true); // Set anyway to allow dashboard to load
+    }
+  };
 
   const loadYears = async () => {
     try {
