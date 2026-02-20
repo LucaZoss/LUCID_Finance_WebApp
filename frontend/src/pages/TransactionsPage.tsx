@@ -12,6 +12,11 @@ export default function TransactionsPage() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editValues, setEditValues] = useState({ type: '', category: '' });
 
+  // Bulk edit
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [isBulkEditMode, setIsBulkEditMode] = useState(false);
+  const [bulkEditValues, setBulkEditValues] = useState({ type: '', category: '' });
+
   // Filters
   const [filterYear, setFilterYear] = useState<number | undefined>();
   const [filterMonth, setFilterMonth] = useState<number | undefined>();
@@ -134,6 +139,60 @@ export default function TransactionsPage() {
     } catch (error) {
       console.error('Failed to delete transaction:', error);
       alert('Failed to delete transaction');
+    }
+  };
+
+  const toggleSelect = (id: number) => {
+    const newSelected = new Set(selectedIds);
+    if (newSelected.has(id)) {
+      newSelected.delete(id);
+    } else {
+      newSelected.add(id);
+    }
+    setSelectedIds(newSelected);
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filteredTransactions.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredTransactions.map((t) => t.id)));
+    }
+  };
+
+  const startBulkEdit = () => {
+    if (selectedIds.size === 0) {
+      alert('Please select at least one transaction');
+      return;
+    }
+    setIsBulkEditMode(true);
+    // Set default values from first selected transaction
+    const firstSelected = transactions.find((t) => selectedIds.has(t.id));
+    if (firstSelected) {
+      setBulkEditValues({ type: firstSelected.type, category: firstSelected.category });
+    }
+  };
+
+  const cancelBulkEdit = () => {
+    setIsBulkEditMode(false);
+    setBulkEditValues({ type: '', category: '' });
+  };
+
+  const saveBulkEdit = async () => {
+    try {
+      await api.bulkUpdateTransactions(Array.from(selectedIds), bulkEditValues);
+      // Update local state
+      setTransactions(
+        transactions.map((t) =>
+          selectedIds.has(t.id) ? { ...t, ...bulkEditValues } : t
+        )
+      );
+      setIsBulkEditMode(false);
+      setSelectedIds(new Set());
+      alert(`Successfully updated ${selectedIds.size} transactions`);
+    } catch (error) {
+      console.error('Failed to bulk update:', error);
+      alert('Failed to update transactions');
     }
   };
 
@@ -375,6 +434,89 @@ export default function TransactionsPage() {
         </div>
       </div>
 
+      {/* Bulk Edit Toolbar */}
+      {selectedIds.size > 0 && (
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+          <div className="flex items-center justify-between flex-wrap gap-4">
+            <div className="flex items-center gap-4">
+              <span className="text-sm font-medium text-blue-900">
+                {selectedIds.size} transaction{selectedIds.size !== 1 ? 's' : ''} selected
+              </span>
+              {isBulkEditMode && (
+                <>
+                  <select
+                    value={bulkEditValues.type}
+                    onChange={(e) => {
+                      setBulkEditValues({
+                        type: e.target.value,
+                        category: getCategoriesForType(e.target.value)[0] || '',
+                      });
+                    }}
+                    className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg"
+                  >
+                    {types.map((t) => (
+                      <option key={t} value={t}>
+                        {t}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    value={bulkEditValues.category}
+                    onChange={(e) =>
+                      setBulkEditValues({ ...bulkEditValues, category: e.target.value })
+                    }
+                    className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg"
+                  >
+                    {getCategoriesForType(bulkEditValues.type).map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                </>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              {isBulkEditMode ? (
+                <>
+                  <button
+                    onClick={saveBulkEdit}
+                    className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg flex items-center"
+                  >
+                    <Check className="w-4 h-4 mr-1" />
+                    Save Changes
+                  </button>
+                  <button
+                    onClick={cancelBulkEdit}
+                    className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg flex items-center"
+                  >
+                    <X className="w-4 h-4 mr-1" />
+                    Cancel
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    onClick={startBulkEdit}
+                    className="px-4 py-2 text-sm font-medium text-blue-700 hover:bg-blue-100 rounded-lg flex items-center"
+                  >
+                    <Edit2 className="w-4 h-4 mr-1" />
+                    Edit Selected
+                  </button>
+                  <button
+                    onClick={() => setSelectedIds(new Set())}
+                    className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg flex items-center"
+                  >
+                    <X className="w-4 h-4 mr-1" />
+                    Clear Selection
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Transactions Table */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-200">
@@ -397,6 +539,14 @@ export default function TransactionsPage() {
             <table className="w-full">
               <thead className="bg-gray-50">
                 <tr>
+                  <th className="px-4 py-3 text-center">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.size === filteredTransactions.length && filteredTransactions.length > 0}
+                      onChange={toggleSelectAll}
+                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                  </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                     Date
                   </th>
@@ -423,6 +573,14 @@ export default function TransactionsPage() {
               <tbody className="divide-y divide-gray-200">
                 {filteredTransactions.map((transaction) => (
                   <tr key={transaction.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-3 text-center">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(transaction.id)}
+                        onChange={() => toggleSelect(transaction.id)}
+                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                    </td>
                     <td className="px-4 py-3 text-sm text-gray-900 whitespace-nowrap">
                       {formatDate(transaction.date)}
                     </td>

@@ -82,6 +82,12 @@ class TransactionUpdate(BaseModel):
     category: Optional[str] = None
 
 
+class BulkTransactionUpdate(BaseModel):
+    transaction_ids: List[int]
+    type: Optional[str] = None
+    category: Optional[str] = None
+
+
 class BudgetPlanResponse(BaseModel):
     id: int
     type: str
@@ -572,6 +578,38 @@ def update_transaction(transaction_id: int, update: TransactionUpdate, current_u
         session.close()
 
 
+@app.patch("/api/transactions/bulk")
+def bulk_update_transactions(bulk_update: BulkTransactionUpdate, current_user: dict = Depends(get_current_user)):
+    """Bulk update multiple transactions' type and/or category."""
+    session = db_manager.get_session()
+    try:
+        # Verify all transactions belong to the current user
+        transactions = session.query(Transaction).filter(
+            Transaction.id.in_(bulk_update.transaction_ids),
+            Transaction.user_id == current_user["id"]
+        ).all()
+
+        if len(transactions) != len(bulk_update.transaction_ids):
+            raise HTTPException(status_code=404, detail="One or more transactions not found or unauthorized")
+
+        # Update all transactions
+        updated_count = 0
+        for transaction in transactions:
+            if bulk_update.type is not None:
+                transaction.type = bulk_update.type
+            if bulk_update.category is not None:
+                transaction.category = bulk_update.category
+            updated_count += 1
+
+        session.commit()
+        return {"updated_count": updated_count, "message": f"Successfully updated {updated_count} transactions"}
+    except Exception as e:
+        session.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        session.close()
+
+
 @app.delete("/api/transactions/{transaction_id}")
 def delete_transaction(transaction_id: int, current_user: dict = Depends(get_current_user)):
     """Delete a transaction."""
@@ -595,7 +633,7 @@ def delete_transaction(transaction_id: int, current_user: dict = Depends(get_cur
 
 
 @app.post("/api/transactions/bulk-update")
-def bulk_update_transactions(updates: dict, current_user: dict = Depends(get_current_user)):
+def bulk_update_by_criteria(updates: dict, current_user: dict = Depends(get_current_user)):
     """Bulk update transactions by criteria (e.g., reclassify all matching transactions)."""
     session = db_manager.get_session()
     try:

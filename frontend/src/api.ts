@@ -76,6 +76,17 @@ export const updateTransaction = async (
   return data;
 };
 
+export const bulkUpdateTransactions = async (
+  transactionIds: number[],
+  update: { type?: string; category?: string }
+): Promise<{ updated_count: number; message: string }> => {
+  const { data } = await api.patch('/transactions/bulk', {
+    transaction_ids: transactionIds,
+    ...update,
+  });
+  return data;
+};
+
 export const deleteTransaction = async (id: number): Promise<void> => {
   await api.delete(`/transactions/${id}`);
 };
