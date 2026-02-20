@@ -46,6 +46,12 @@ export interface DashboardSummary {
     savings: { actual: number; budget: number };
     net: { actual: number; budget: number };
   };
+  fixed_cost_ratio: number;
+  previous_period: {
+    year: number;
+    month: number | null;
+    net: number;
+  };
 }
 
 export interface MonthlyTrend {

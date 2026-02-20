@@ -228,6 +228,7 @@ export default function DashboardPage() {
 
       {/* Summary Cards */}
       <div className="grid md:grid-cols-4 gap-6">
+        {/* Income Card */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="p-2 bg-green-100 rounded-lg">
@@ -240,22 +241,27 @@ export default function DashboardPage() {
             <p className="text-sm text-gray-500 mt-1">
               Budget: {formatAmount(summary.totals.income.budget)}
             </p>
-            <div className="mt-2 flex items-center text-sm">
-              {summary.totals.income.actual >= summary.totals.income.budget ? (
-                <span className="text-green-600 flex items-center">
-                  <TrendingUp className="w-4 h-4 mr-1" />
-                  {((summary.totals.income.actual / summary.totals.income.budget) * 100 - 100).toFixed(1)}%
-                </span>
-              ) : (
-                <span className="text-red-600 flex items-center">
-                  <TrendingDown className="w-4 h-4 mr-1" />
-                  {((summary.totals.income.actual / summary.totals.income.budget) * 100 - 100).toFixed(1)}%
-                </span>
-              )}
+            <div className="mt-3">
+              {(() => {
+                const incomePercent = summary.totals.income.budget > 0
+                  ? (summary.totals.income.actual / summary.totals.income.budget) * 100
+                  : 0;
+                const colorClass = incomePercent < 100
+                  ? 'bg-red-100 text-red-700 border-red-300'
+                  : incomePercent > 100
+                    ? 'bg-green-100 text-green-700 border-green-300'
+                    : 'bg-gray-100 text-gray-700 border-gray-300';
+                return (
+                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold border ${colorClass}`}>
+                    {incomePercent.toFixed(1)}% of Budget
+                  </span>
+                );
+              })()}
             </div>
           </div>
         </div>
 
+        {/* Expenses Card */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="p-2 bg-red-100 rounded-lg">
@@ -268,46 +274,59 @@ export default function DashboardPage() {
             <p className="text-sm text-gray-500 mt-1">
               Budget: {formatAmount(summary.totals.expenses.budget)}
             </p>
-            <div className="mt-2 flex items-center text-sm">
-              {summary.totals.expenses.actual <= summary.totals.expenses.budget ? (
-                <span className="text-green-600">
-                  Under budget by {formatAmount(summary.totals.expenses.budget - summary.totals.expenses.actual)}
-                </span>
-              ) : (
-                <span className="text-red-600">
-                  Over budget by {formatAmount(summary.totals.expenses.actual - summary.totals.expenses.budget)}
-                </span>
-              )}
+            <div className="mt-3">
+              {(() => {
+                const expensePercent = summary.totals.expenses.budget > 0
+                  ? (summary.totals.expenses.actual / summary.totals.expenses.budget) * 100
+                  : 0;
+                const colorClass = expensePercent < 100
+                  ? 'bg-green-100 text-green-700 border-green-300'
+                  : expensePercent > 100
+                    ? 'bg-red-100 text-red-700 border-red-300'
+                    : 'bg-gray-100 text-gray-700 border-gray-300';
+                return (
+                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold border ${colorClass}`}>
+                    {expensePercent.toFixed(1)}% of Budget
+                  </span>
+                );
+              })()}
             </div>
           </div>
         </div>
 
+        {/* Fixed Cost Ratio Card (replaces Savings) */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="flex items-center justify-between mb-4">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <DollarSign className="w-6 h-6 text-blue-600" />
+            <div className="p-2 bg-purple-100 rounded-lg">
+              <DollarSign className="w-6 h-6 text-purple-600" />
             </div>
-            <span className="text-xs font-medium text-gray-500">SAVINGS</span>
+            <span className="text-xs font-medium text-gray-500">FIXED COST RATIO</span>
           </div>
           <div>
-            <p className="text-2xl font-bold text-gray-900">{formatAmount(summary.totals.savings.actual)}</p>
+            <p className="text-2xl font-bold text-gray-900">{summary.fixed_cost_ratio.toFixed(1)}%</p>
             <p className="text-sm text-gray-500 mt-1">
-              Budget: {formatAmount(summary.totals.savings.budget)}
+              Housing + Health + Tax
             </p>
-            <div className="mt-2 flex items-center text-sm">
-              {summary.totals.savings.actual >= summary.totals.savings.budget ? (
-                <span className="text-green-600">
-                  Ahead by {formatAmount(summary.totals.savings.actual - summary.totals.savings.budget)}
-                </span>
-              ) : (
-                <span className="text-gray-600">
-                  {formatAmount(summary.totals.savings.budget - summary.totals.savings.actual)} remaining
-                </span>
-              )}
+            <div className="mt-3">
+              {(() => {
+                const ratio = summary.fixed_cost_ratio;
+                const colorClass = ratio < 50
+                  ? 'bg-green-100 text-green-700 border-green-300'
+                  : ratio < 60
+                    ? 'bg-yellow-100 text-yellow-700 border-yellow-300'
+                    : 'bg-red-100 text-red-700 border-red-300';
+                const label = ratio < 50 ? 'Excellent' : ratio < 60 ? 'Good' : 'High';
+                return (
+                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold border ${colorClass}`}>
+                    {label}
+                  </span>
+                );
+              })()}
             </div>
           </div>
         </div>
 
+        {/* Net Balance Card - YoY Comparison */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="flex items-center justify-between mb-4">
             <div className={`p-2 rounded-lg ${isPositiveNet ? 'bg-green-100' : 'bg-red-100'}`}>
@@ -320,14 +339,23 @@ export default function DashboardPage() {
               {formatAmount(netActual)}
             </p>
             <p className="text-sm text-gray-500 mt-1">
-              Budget: {formatAmount(netBudget)}
+              vs {summary.previous_period.month ? months[summary.previous_period.month - 1] : 'Full Year'} {summary.previous_period.year}
             </p>
-            <div className="mt-2 flex items-center text-sm">
-              {isPositiveNet ? (
-                <span className="text-green-600">Surplus</span>
-              ) : (
-                <span className="text-red-600">Deficit</span>
-              )}
+            <div className="mt-3">
+              {(() => {
+                const prevNet = summary.previous_period.net;
+                const change = netActual - prevNet;
+                const changePercent = prevNet !== 0 ? (change / Math.abs(prevNet)) * 100 : 0;
+                const isPositive = change >= 0;
+                const colorClass = isPositive
+                  ? 'bg-green-100 text-green-700 border-green-300'
+                  : 'bg-red-100 text-red-700 border-red-300';
+                return (
+                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold border ${colorClass}`}>
+                    {isPositive ? '+' : ''}{formatAmount(change)} ({isPositive ? '+' : ''}{changePercent.toFixed(1)}%)
+                  </span>
+                );
+              })()}
             </div>
           </div>
         </div>

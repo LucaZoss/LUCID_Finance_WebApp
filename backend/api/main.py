@@ -148,6 +148,8 @@ class DashboardSummary(BaseModel):
     expenses: List[SummaryItem]
     savings: List[SummaryItem]
     totals: dict
+    fixed_cost_ratio: float
+    previous_period: dict
 
 
 class LoginRequest(BaseModel):
@@ -1163,6 +1165,38 @@ def get_dashboard_summary(year: int, month: Optional[int] = None, current_user: 
         total_savings_actual = sum(i.actual for i in savings_summary)
         total_savings_budget = sum(i.budget for i in savings_summary)
 
+        # Calculate Fixed Cost Ratio = (Housing + Health + Tax) / Total Income
+        fixed_cost_categories = ["Housing", "Health Insurance", "Health Other", "Tax"]
+        total_fixed_costs = sum(
+            item.actual for item in expense_summary
+            if item.category in fixed_cost_categories
+        )
+        fixed_cost_ratio = (total_fixed_costs / total_income_actual * 100) if total_income_actual > 0 else 0.0
+
+        # Get previous period data for year-over-year comparison
+        previous_year = year - 1
+        previous_month = month  # Same month last year, or None for full year
+
+        # Query previous period net balance
+        prev_actual_query = session.query(
+            Transaction.type,
+            func.sum(Transaction.amount).label("total"),
+        ).filter(
+            Transaction.user_id == current_user["id"],
+            Transaction.year == previous_year
+        )
+
+        if previous_month:
+            prev_actual_query = prev_actual_query.filter(Transaction.month == previous_month)
+
+        prev_actual_query = prev_actual_query.group_by(Transaction.type)
+        prev_actuals = {r.type: float(r.total) for r in prev_actual_query.all()}
+
+        prev_income = prev_actuals.get("Income", 0.0)
+        prev_expenses = prev_actuals.get("Expenses", 0.0)
+        prev_savings = prev_actuals.get("Savings", 0.0)
+        prev_net = prev_income - prev_expenses - prev_savings
+
         return DashboardSummary(
             year=year,
             month=month,
@@ -1177,6 +1211,12 @@ def get_dashboard_summary(year: int, month: Optional[int] = None, current_user: 
                     "actual": total_income_actual - total_expense_actual - total_savings_actual,
                     "budget": total_income_budget - total_expense_budget - total_savings_budget,
                 },
+            },
+            fixed_cost_ratio=round(fixed_cost_ratio, 1),
+            previous_period={
+                "year": previous_year,
+                "month": previous_month,
+                "net": prev_net,
             },
         )
 
