@@ -40,6 +40,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       clearTimeout(inactivityTimerRef.current);
       inactivityTimerRef.current = null;
     }
+
+    // Redirect to login page
+    window.location.href = '/login';
   }, []);
 
   const resetInactivityTimer = useCallback(() => {
