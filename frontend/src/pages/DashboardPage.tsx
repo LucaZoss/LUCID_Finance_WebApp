@@ -153,6 +153,15 @@ export default function DashboardPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Budget Dashboard</h1>
           <p className="text-gray-500 mt-1">Overview for {getPeriodText()}</p>
+          {summary.latest_transaction_date && (
+            <p className="text-gray-400 text-sm">
+              Latest data until {new Date(summary.latest_transaction_date).toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+              })}
+            </p>
+          )}
         </div>
 
         <div className="flex items-center gap-4">

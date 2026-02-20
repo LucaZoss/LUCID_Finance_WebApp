@@ -52,6 +52,7 @@ export interface DashboardSummary {
     month: number | null;
     net: number;
   };
+  latest_transaction_date: string | null;
 }
 
 export interface MonthlyTrend {

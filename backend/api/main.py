@@ -150,6 +150,7 @@ class DashboardSummary(BaseModel):
     totals: dict
     fixed_cost_ratio: float
     previous_period: dict
+    latest_transaction_date: Optional[str]
 
 
 class LoginRequest(BaseModel):
@@ -1197,6 +1198,13 @@ def get_dashboard_summary(year: int, month: Optional[int] = None, current_user: 
         prev_savings = prev_actuals.get("Savings", 0.0)
         prev_net = prev_income - prev_expenses - prev_savings
 
+        # Get latest transaction date
+        latest_date_query = session.query(func.max(Transaction.date)).filter(
+            Transaction.user_id == current_user["id"]
+        )
+        latest_date_result = latest_date_query.scalar()
+        latest_transaction_date = latest_date_result.strftime("%Y-%m-%d") if latest_date_result else None
+
         return DashboardSummary(
             year=year,
             month=month,
@@ -1218,6 +1226,7 @@ def get_dashboard_summary(year: int, month: Optional[int] = None, current_user: 
                 "month": previous_month,
                 "net": prev_net,
             },
+            latest_transaction_date=latest_transaction_date,
         )
 
     finally:
