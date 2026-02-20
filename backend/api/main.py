@@ -1229,6 +1229,7 @@ def get_monthly_trend(year: int, categories: Optional[str] = None, current_user:
     """Get monthly spending trend for the year, optionally filtered by categories (comma-separated)."""
     session = db_manager.get_session()
     try:
+        # Get actual transactions
         query = session.query(
             Transaction.month,
             Transaction.type,
@@ -1249,11 +1250,52 @@ def get_monthly_trend(year: int, categories: Optional[str] = None, current_user:
 
         results = query.all()
 
+        # Get budget data
+        budget_query = session.query(
+            BudgetPlan.month,
+            BudgetPlan.type,
+            func.sum(BudgetPlan.amount).label("total"),
+        ).filter(
+            BudgetPlan.user_id == current_user["id"],
+            BudgetPlan.year == year,
+            BudgetPlan.month.isnot(None)
+        )
+
+        # Add category filter for budgets if provided
+        if categories:
+            category_list = [c.strip() for c in categories.split(',')]
+            budget_query = budget_query.filter(BudgetPlan.category.in_(category_list))
+
+        budget_query = budget_query.group_by(
+            BudgetPlan.month, BudgetPlan.type
+        ).order_by(BudgetPlan.month)
+
+        budget_results = budget_query.all()
+
         # Organize by month
-        months = {i: {"month": i, "Income": 0, "Expenses": 0, "Savings": 0} for i in range(1, 13)}
+        months = {i: {
+            "month": i,
+            "Income": 0,
+            "Expenses": 0,
+            "Savings": 0,
+            "IncomeBudget": 0,
+            "ExpensesBudget": 0,
+            "SavingsBudget": 0
+        } for i in range(1, 13)}
+
+        # Fill in actual data
         for r in results:
             if r.type in months[r.month]:
                 months[r.month][r.type] = float(r.total)
+
+        # Fill in budget data
+        for r in budget_results:
+            if r.type == "Income":
+                months[r.month]["IncomeBudget"] = float(r.total)
+            elif r.type == "Expenses":
+                months[r.month]["ExpensesBudget"] = float(r.total)
+            elif r.type == "Savings":
+                months[r.month]["SavingsBudget"] = float(r.total)
 
         return list(months.values())
 

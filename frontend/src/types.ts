@@ -59,4 +59,7 @@ export interface MonthlyTrend {
   Income: number;
   Expenses: number;
   Savings: number;
+  IncomeBudget: number;
+  ExpensesBudget: number;
+  SavingsBudget: number;
 }

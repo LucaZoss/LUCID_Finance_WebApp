@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import {
   BarChart,
   Bar,
-  Line,
   ComposedChart,
   PieChart,
   Pie,
@@ -139,8 +138,9 @@ export default function DashboardPage() {
     Income: item.Income,
     Expenses: item.Expenses,
     Savings: item.Savings,
-    Surplus: item.Income - item.Expenses,
-    SurplusPercent: item.Income > 0 ? ((item.Income - item.Expenses) / item.Income) * 100 : 0,
+    IncomeBudget: item.IncomeBudget,
+    ExpensesBudget: item.ExpensesBudget,
+    SavingsBudget: item.SavingsBudget,
   }));
 
   const netActual = summary.totals.net.actual;
@@ -374,34 +374,24 @@ export default function DashboardPage() {
           <ComposedChart data={trendChartData}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="month" />
-            <YAxis yAxisId="left" tickFormatter={formatShortAmount} />
-            <YAxis yAxisId="right" orientation="right" tickFormatter={(value) => `${value.toFixed(0)}%`} />
+            <YAxis tickFormatter={formatShortAmount} />
             <Tooltip
-              formatter={(value: number | undefined, name: string | undefined) => {
+              formatter={(value: number | undefined) => {
                 if (value === undefined) return 'N/A';
-                if (name === 'Surplus Rate') {
-                  return `${value.toFixed(1)}%`;
-                }
                 return formatAmount(value);
               }}
             />
             <Legend />
-            <Bar yAxisId="left" dataKey="Income" fill={COLORS.income} name="Income" />
-            <Bar yAxisId="left" dataKey="Expenses" fill={COLORS.expenses} name="Expenses" />
-            <Bar yAxisId="left" dataKey="Savings" fill={COLORS.savings} name="Savings" />
-            <Line
-              yAxisId="right"
-              type="monotone"
-              dataKey="SurplusPercent"
-              stroke={COLORS.remaining}
-              strokeWidth={3}
-              name="Surplus Rate"
-              dot={{ fill: COLORS.remaining, r: 4 }}
-            />
+            <Bar dataKey="Income" fill={COLORS.income} name="Income (Actual)" />
+            <Bar dataKey="IncomeBudget" fill="#9ca3af" name="Income (Budget)" />
+            <Bar dataKey="Expenses" fill={COLORS.expenses} name="Expenses (Actual)" />
+            <Bar dataKey="ExpensesBudget" fill="#9ca3af" name="Expenses (Budget)" />
+            <Bar dataKey="Savings" fill={COLORS.savings} name="Savings (Actual)" />
+            <Bar dataKey="SavingsBudget" fill="#9ca3af" name="Savings (Budget)" />
           </ComposedChart>
         </ResponsiveContainer>
         <p className="text-xs text-gray-500 mt-2">
-          Surplus Rate shows the percentage of income remaining after expenses (before savings allocation)
+          Colored bars show actual values, grey bars show budgeted values
         </p>
       </div>
 
