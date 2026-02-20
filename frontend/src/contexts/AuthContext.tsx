@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import type { ReactNode } from 'react';
 import * as api from '../api';
 
@@ -18,10 +18,87 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Inactivity timeout: 1 hour (in milliseconds)
+const INACTIVITY_TIMEOUT = 60 * 60 * 1000;
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const inactivityTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const logout = useCallback(() => {
+    setUser(null);
+    setToken(null);
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('auth_user');
+    localStorage.removeItem('last_activity');
+    api.setAuthToken(null);
+
+    // Clear inactivity timer
+    if (inactivityTimerRef.current) {
+      clearTimeout(inactivityTimerRef.current);
+      inactivityTimerRef.current = null;
+    }
+  }, []);
+
+  const resetInactivityTimer = useCallback(() => {
+    // Update last activity time
+    localStorage.setItem('last_activity', Date.now().toString());
+
+    // Clear existing timer
+    if (inactivityTimerRef.current) {
+      clearTimeout(inactivityTimerRef.current);
+    }
+
+    // Set new timer
+    inactivityTimerRef.current = setTimeout(() => {
+      console.log('User inactive for 1 hour, logging out...');
+      logout();
+    }, INACTIVITY_TIMEOUT);
+  }, [logout]);
+
+  // Track user activity
+  useEffect(() => {
+    if (!token) return;
+
+    const events = ['mousedown', 'keydown', 'scroll', 'touchstart', 'click'];
+
+    const handleActivity = () => {
+      resetInactivityTimer();
+    };
+
+    // Add event listeners
+    events.forEach(event => {
+      document.addEventListener(event, handleActivity);
+    });
+
+    // Initialize timer on mount
+    resetInactivityTimer();
+
+    // Check for inactivity on interval (every minute)
+    const checkInterval = setInterval(() => {
+      const lastActivity = localStorage.getItem('last_activity');
+      if (lastActivity) {
+        const timeSinceLastActivity = Date.now() - parseInt(lastActivity, 10);
+        if (timeSinceLastActivity > INACTIVITY_TIMEOUT) {
+          console.log('Inactivity timeout exceeded, logging out...');
+          logout();
+        }
+      }
+    }, 60000); // Check every minute
+
+    return () => {
+      // Cleanup
+      events.forEach(event => {
+        document.removeEventListener(event, handleActivity);
+      });
+      clearInterval(checkInterval);
+      if (inactivityTimerRef.current) {
+        clearTimeout(inactivityTimerRef.current);
+      }
+    };
+  }, [token, logout, resetInactivityTimer]);
 
   // Load token and user from localStorage on mount
   useEffect(() => {
@@ -57,18 +134,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       // Set token for future API calls
       api.setAuthToken(response.access_token);
+
+      // Initialize inactivity timer
+      resetInactivityTimer();
     } catch (error: any) {
       console.error('Login failed:', error);
       throw new Error(error?.response?.data?.detail || 'Login failed');
     }
-  };
-
-  const logout = () => {
-    setUser(null);
-    setToken(null);
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('auth_user');
-    api.setAuthToken(null);
   };
 
   return (
