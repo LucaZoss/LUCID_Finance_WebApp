@@ -392,11 +392,8 @@ export default function DashboardPage() {
             />
             <Legend />
             <Bar dataKey="Income" fill={COLORS.income} name="Income (Actual)" />
-            <Bar dataKey="IncomeBudget" fill="#9ca3af" name="Income (Budget)" />
             <Bar dataKey="Expenses" fill={COLORS.expenses} name="Expenses (Actual)" />
-            <Bar dataKey="ExpensesBudget" fill="#9ca3af" name="Expenses (Budget)" />
             <Bar dataKey="Savings" fill={COLORS.savings} name="Savings (Actual)" />
-            <Bar dataKey="SavingsBudget" fill="#9ca3af" name="Savings (Budget)" />
           </ComposedChart>
         </ResponsiveContainer>
         <p className="text-xs text-gray-500 mt-2">
