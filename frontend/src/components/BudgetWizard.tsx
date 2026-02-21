@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { X, ChevronLeft, ChevronRight, Check, DollarSign, Home, Heart, ShoppingCart, Smile, PiggyBank, TrendingUp, Plus, Trash2 } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, Check, DollarSign, Home, ShoppingCart, Smile, PiggyBank, TrendingUp, Plus, Trash2 } from 'lucide-react';
 import * as api from '../api';
 
 interface WizardFormData {
@@ -10,14 +10,7 @@ interface WizardFormData {
   monthlyRent: number;
   healthInsurance: number;
 
-  // Step 3 - Other Essentials
-  essentials: {
-    carLease: number;
-    debtPayments: number;
-    otherEssentials: Array<{ category: string; amount: number; isNew: boolean }>;
-  };
-
-  // Step 4
+  // Step 3 - Needs
   needs: Array<{
     categoryId: number | null;
     categoryName: string;
@@ -25,7 +18,7 @@ interface WizardFormData {
     monthlyAmount: number;
   }>;
 
-  // Step 5
+  // Step 4 - Wants
   wants: Array<{
     categoryId: number | null;
     categoryName: string;
@@ -33,7 +26,7 @@ interface WizardFormData {
     monthlyAmount: number;
   }>;
 
-  // Step 6
+  // Step 5 - Savings Goal
   annualSavingsGoal: number;
 }
 
@@ -47,11 +40,6 @@ const initialFormData: WizardFormData = {
   annualIncome: 0,
   monthlyRent: 0,
   healthInsurance: 0,
-  essentials: {
-    carLease: 0,
-    debtPayments: 0,
-    otherEssentials: [],
-  },
   needs: [],
   wants: [],
   annualSavingsGoal: 0,
@@ -71,7 +59,7 @@ export default function BudgetWizard({ onClose, onSuccess, selectedYear }: Budge
   const [showNewWantInput, setShowNewWantInput] = useState(false);
   const [newWantName, setNewWantName] = useState('');
 
-  const stepTitles = ['Income', 'Essentials', 'Other Costs', 'Needs', 'Wants', 'Savings', 'Review'];
+  const stepTitles = ['Income', 'Essentials', 'Needs', 'Wants', 'Savings', 'Review'];
 
   // Load categories and existing budgets on mount
   useEffect(() => {
@@ -109,12 +97,8 @@ export default function BudgetWizard({ onClose, onSuccess, selectedYear }: Budge
   const monthlyIncome = useMemo(() => formData.annualIncome / 12, [formData.annualIncome]);
 
   const fixedCosts = useMemo(() => {
-    return formData.monthlyRent +
-           formData.healthInsurance +
-           formData.essentials.carLease +
-           formData.essentials.debtPayments +
-           formData.essentials.otherEssentials.reduce((sum, e) => sum + e.amount, 0);
-  }, [formData.monthlyRent, formData.healthInsurance, formData.essentials]);
+    return formData.monthlyRent + formData.healthInsurance;
+  }, [formData.monthlyRent, formData.healthInsurance]);
 
   const needsTotal = useMemo(() =>
     formData.needs.reduce((sum, n) => sum + n.monthlyAmount, 0),
@@ -154,17 +138,13 @@ export default function BudgetWizard({ onClose, onSuccess, selectedYear }: Budge
       case 2:
         return formData.monthlyRent >= 0 && formData.healthInsurance >= 0;
       case 3:
-        return formData.essentials.otherEssentials.every(e =>
-          e.amount >= 0 && (e.amount === 0 || e.category.trim() !== '')
-        );
-      case 4:
         return formData.needs.length > 0 &&
                formData.needs.every(n => n.monthlyAmount > 0);
-      case 5:
+      case 4:
         return formData.wants.every(w => w.monthlyAmount >= 0);
-      case 6:
+      case 5:
         return formData.annualSavingsGoal >= 0;
-      case 7:
+      case 6:
         return true;
       default:
         return false;
@@ -178,7 +158,7 @@ export default function BudgetWizard({ onClose, onSuccess, selectedYear }: Budge
     }
 
     setValidationErrors({});
-    setCurrentStep(prev => Math.min(prev + 1, 7));
+    setCurrentStep(prev => Math.min(prev + 1, 6));
   };
 
   const handleBack = () => {
@@ -205,15 +185,13 @@ export default function BudgetWizard({ onClose, onSuccess, selectedYear }: Budge
     try {
       // Step 1: Create new categories
       const newCategories = [
-        ...formData.essentials.otherEssentials.filter(e => e.isNew && e.category.trim()),
         ...formData.needs.filter(n => n.isNew),
         ...formData.wants.filter(w => w.isNew),
       ];
 
       for (const cat of newCategories) {
-        const categoryName = 'category' in cat ? cat.category : cat.categoryName;
         await api.createCategory({
-          name: categoryName,
+          name: cat.categoryName,
           type: 'Expenses',
           display_order: 0,
         });
@@ -255,40 +233,6 @@ export default function BudgetWizard({ onClose, onSuccess, selectedYear }: Budge
         });
       }
 
-      // Car Lease
-      if (formData.essentials.carLease > 0) {
-        budgetsToCreate.push({
-          type: 'Expenses',
-          category: 'Car',
-          year: selectedYear,
-          month: null,
-          amount: formData.essentials.carLease * 12,
-        });
-      }
-
-      // Debt Payments
-      if (formData.essentials.debtPayments > 0) {
-        budgetsToCreate.push({
-          type: 'Expenses',
-          category: 'Debt',
-          year: selectedYear,
-          month: null,
-          amount: formData.essentials.debtPayments * 12,
-        });
-      }
-
-      // Other essentials
-      formData.essentials.otherEssentials.forEach(essential => {
-        if (essential.amount > 0) {
-          budgetsToCreate.push({
-            type: 'Expenses',
-            category: essential.category,
-            year: selectedYear,
-            month: null,
-            amount: essential.amount * 12,
-          });
-        }
-      });
 
       // Needs
       formData.needs.forEach(need => {
@@ -379,21 +323,24 @@ export default function BudgetWizard({ onClose, onSuccess, selectedYear }: Budge
   );
 
   // Step 1: Annual Income
-  const renderStep1 = () => (
-    <div className="space-y-6">
-      <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-8 rounded-xl text-center">
-        <DollarSign className="w-12 h-12 text-blue-600 mx-auto mb-4" />
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">What's your estimated annual income?</h2>
-        <p className="text-gray-600 mb-6">Enter your total yearly income before taxes</p>
+  const renderStep1 = () => {
+    const suggestedIncome = existingBudgets.get('employment') ? existingBudgets.get('employment')! * 12 : 0;
 
-        <div className="max-w-md mx-auto">
-          <input
-            type="number"
-            value={formData.annualIncome || ''}
-            onChange={(e) => setFormData({ ...formData, annualIncome: Number(e.target.value) })}
-            placeholder="e.g., 85000"
-            className="w-full text-3xl text-center px-6 py-4 border-2 border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          />
+    return (
+      <div className="space-y-6">
+        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-8 rounded-xl text-center">
+          <DollarSign className="w-12 h-12 text-blue-600 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">What's your estimated annual income?</h2>
+          <p className="text-gray-600 mb-6">Enter your total yearly income before taxes</p>
+
+          <div className="max-w-md mx-auto">
+            <input
+              type="number"
+              value={formData.annualIncome || ''}
+              onChange={(e) => setFormData({ ...formData, annualIncome: Number(e.target.value) })}
+              placeholder={suggestedIncome > 0 ? `Suggested: ${suggestedIncome.toFixed(0)}` : "e.g., 85000"}
+              className="w-full text-3xl text-center px-6 py-4 border-2 border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            />
 
           {formData.annualIncome > 0 && (
             <div className="mt-4 p-4 bg-white rounded-lg">
@@ -410,7 +357,8 @@ export default function BudgetWizard({ onClose, onSuccess, selectedYear }: Budge
         <p className="text-red-600 text-sm text-center">{validationErrors.step}</p>
       )}
     </div>
-  );
+    );
+  };
 
   // Step 2: Essential Fixed Costs (Housing + Health Insurance)
   const renderStep2 = () => {
@@ -483,133 +431,15 @@ export default function BudgetWizard({ onClose, onSuccess, selectedYear }: Budge
     );
   };
 
-  // Step 3: Essentials
+
+  // Step 3: Needs (renamed from Step 4)
   const renderStep3 = () => {
-    const addEssential = () => {
-      setFormData({
-        ...formData,
-        essentials: {
-          ...formData.essentials,
-          otherEssentials: [
-            ...formData.essentials.otherEssentials,
-            { category: '', amount: 0, isNew: true }
-          ]
-        }
-      });
-    };
-
-    const removeEssential = (index: number) => {
-      setFormData({
-        ...formData,
-        essentials: {
-          ...formData.essentials,
-          otherEssentials: formData.essentials.otherEssentials.filter((_, i) => i !== index)
-        }
-      });
-    };
-
-    const updateEssential = (index: number, field: 'category' | 'amount', value: string | number) => {
-      const updated = [...formData.essentials.otherEssentials];
-      updated[index] = { ...updated[index], [field]: value };
-      setFormData({
-        ...formData,
-        essentials: { ...formData.essentials, otherEssentials: updated }
-      });
-    };
-
-    const totalEssentials = fixedCosts - formData.monthlyRent - formData.healthInsurance;
-
-    return (
-      <div className="space-y-6">
-        <div className="bg-gradient-to-br from-orange-50 to-amber-50 p-8 rounded-xl">
-          <Heart className="w-12 h-12 text-orange-600 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900 mb-2 text-center">Other Costs</h2>
-          <p className="text-gray-600 mb-6 text-center">Additional essential monthly expenses</p>
-
-          <div className="max-w-2xl mx-auto space-y-4">
-            {/* Fixed essentials */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Car Lease / Payment (monthly)
-              </label>
-              <input
-                type="number"
-                value={formData.essentials.carLease || ''}
-                onChange={(e) => setFormData({
-                  ...formData,
-                  essentials: { ...formData.essentials, carLease: Number(e.target.value) }
-                })}
-                placeholder={existingBudgets.has('car') ? `Suggested: ${existingBudgets.get('car')?.toFixed(0)}` : 'e.g., 400'}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Debt Payments (monthly)
-              </label>
-              <input
-                type="number"
-                value={formData.essentials.debtPayments || ''}
-                onChange={(e) => setFormData({
-                  ...formData,
-                  essentials: { ...formData.essentials, debtPayments: Number(e.target.value) }
-                })}
-                placeholder={existingBudgets.has('debt') ? `Suggested: ${existingBudgets.get('debt')?.toFixed(0)}` : 'e.g., 200'}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
-              />
-            </div>
-
-            {/* Dynamic essentials */}
-            {formData.essentials.otherEssentials.map((essential, idx) => (
-              <div key={idx} className="flex gap-2 p-3 bg-white rounded-lg border border-gray-200">
-                <input
-                  type="text"
-                  placeholder="Category name (e.g., Internet)"
-                  value={essential.category}
-                  onChange={(e) => updateEssential(idx, 'category', e.target.value)}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
-                />
-                <input
-                  type="number"
-                  placeholder="Amount"
-                  value={essential.amount || ''}
-                  onChange={(e) => updateEssential(idx, 'amount', Number(e.target.value))}
-                  className="w-32 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
-                />
-                <button
-                  onClick={() => removeEssential(idx)}
-                  className="px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                >
-                  <Trash2 className="w-5 h-5" />
-                </button>
-              </div>
-            ))}
-
-            <button
-              onClick={addEssential}
-              className="w-full px-4 py-2 border-2 border-dashed border-gray-300 text-gray-600 rounded-lg hover:border-orange-400 hover:text-orange-600 transition-colors flex items-center justify-center"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Add Essential Expense
-            </button>
-
-            {/* Total */}
-            <div className="mt-6 p-4 bg-white rounded-lg border-2 border-orange-200">
-              <div className="flex justify-between items-center">
-                <span className="font-semibold text-gray-900">Total Fixed Essentials:</span>
-                <span className="text-2xl font-bold text-orange-600">{formatAmount(totalEssentials)}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+    // Filter out Housing and Health Insurance (already covered in Step 2)
+    const expenseCategories = categories.filter(c =>
+      c.type === 'Expenses' &&
+      c.name.toLowerCase() !== 'housing' &&
+      c.name.toLowerCase() !== 'health insurance'
     );
-  };
-
-  // Step 4: Needs
-  const renderStep4 = () => {
-    const expenseCategories = categories.filter(c => c.type === 'Expenses');
     const selectedNeedIds = new Set(formData.needs.filter(n => n.categoryId !== null).map(n => n.categoryId));
 
     const toggleNeedCategory = (categoryId: number, categoryName: string) => {
@@ -817,9 +647,18 @@ export default function BudgetWizard({ onClose, onSuccess, selectedYear }: Budge
     );
   };
 
-  // Step 5: Wants
-  const renderStep5 = () => {
-    const expenseCategories = categories.filter(c => c.type === 'Expenses');
+  // Step 4: Wants (renamed from Step 5)
+  const renderStep4 = () => {
+    // Get IDs of categories already selected as Needs
+    const selectedNeedCategoryIds = new Set(formData.needs.filter(n => n.categoryId !== null).map(n => n.categoryId));
+
+    // Filter out Housing, Health Insurance, and categories already selected as Needs
+    const expenseCategories = categories.filter(c =>
+      c.type === 'Expenses' &&
+      c.name.toLowerCase() !== 'housing' &&
+      c.name.toLowerCase() !== 'health insurance' &&
+      !selectedNeedCategoryIds.has(c.id)
+    );
     const selectedWantIds = new Set(formData.wants.filter(w => w.categoryId !== null).map(w => w.categoryId));
 
     const toggleWantCategory = (categoryId: number, categoryName: string) => {
@@ -1025,8 +864,8 @@ export default function BudgetWizard({ onClose, onSuccess, selectedYear }: Budge
     );
   };
 
-  // Step 6: Savings Goal
-  const renderStep6 = () => {
+  // Step 5: Savings Goal (renamed from Step 6)
+  const renderStep5 = () => {
     const savingsPercentage = formData.annualIncome > 0 ?
       (formData.annualSavingsGoal / formData.annualIncome) * 100 : 0;
 
@@ -1106,8 +945,8 @@ export default function BudgetWizard({ onClose, onSuccess, selectedYear }: Budge
     );
   };
 
-  // Step 7: Review & Adjust
-  const renderStep7 = () => {
+  // Step 6: Review & Adjust (renamed from Step 7)
+  const renderStep6 = () => {
     const handleAllocationChange = (category: 'needs' | 'wants' | 'savings', newTotal: number) => {
       if (category === 'needs' && needsTotal > 0) {
         const ratio = newTotal / needsTotal;
@@ -1158,7 +997,7 @@ export default function BudgetWizard({ onClose, onSuccess, selectedYear }: Budge
               {/* Fixed costs */}
               <div className="space-y-2 pb-3 border-b">
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Fixed Costs (Housing + Essentials)</span>
+                  <span className="text-gray-600">Fixed Costs (Housing + Health Insurance)</span>
                   <span className="font-medium text-gray-900">- {formatAmount(fixedCosts)}</span>
                 </div>
                 {formData.monthlyRent > 0 && (
@@ -1167,12 +1006,10 @@ export default function BudgetWizard({ onClose, onSuccess, selectedYear }: Budge
                     <span className="text-gray-600">{formatAmount(formData.monthlyRent)}</span>
                   </div>
                 )}
-                {(formData.healthInsurance + formData.essentials.carLease + formData.essentials.debtPayments) > 0 && (
+                {formData.healthInsurance > 0 && (
                   <div className="flex justify-between text-xs pl-4">
-                    <span className="text-gray-500">• Essentials</span>
-                    <span className="text-gray-600">
-                      {formatAmount(fixedCosts - formData.monthlyRent)}
-                    </span>
+                    <span className="text-gray-500">• Health Insurance</span>
+                    <span className="text-gray-600">{formatAmount(formData.healthInsurance)}</span>
                   </div>
                 )}
               </div>
@@ -1295,7 +1132,6 @@ export default function BudgetWizard({ onClose, onSuccess, selectedYear }: Budge
       case 4: return renderStep4();
       case 5: return renderStep5();
       case 6: return renderStep6();
-      case 7: return renderStep7();
       default: return null;
     }
   };
@@ -1336,10 +1172,10 @@ export default function BudgetWizard({ onClose, onSuccess, selectedYear }: Budge
           </button>
 
           <div className="text-sm text-gray-600">
-            Step {currentStep} of 7
+            Step {currentStep} of 6
           </div>
 
-          {currentStep < 7 ? (
+          {currentStep < 6 ? (
             <button
               onClick={handleNext}
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center"
