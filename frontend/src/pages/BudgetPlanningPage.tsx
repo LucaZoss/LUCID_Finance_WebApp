@@ -456,37 +456,50 @@ export default function BudgetPlanningPage() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Amount (CHF)
+                Amount (CHF) - {newBudget.isMonthly ? 'Monthly' : 'Yearly Total'}
               </label>
               <input
                 type="number"
                 value={newBudget.amount || ''}
                 onChange={(e) => setNewBudget({ ...newBudget, amount: Number(e.target.value) })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                placeholder="0"
+                placeholder={newBudget.isMonthly ? "e.g., 1500" : "e.g., 12000"}
               />
+              {!newBudget.isMonthly && newBudget.amount > 0 && (
+                <p className="text-xs text-gray-500 mt-1">
+                  → {(newBudget.amount / 12).toFixed(2)} CHF per month
+                </p>
+              )}
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
-              <div className="flex items-center gap-4 pt-2">
-                <label className="flex items-center">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Budget Type</label>
+              <div className="flex flex-col gap-2 pt-2">
+                <label className="flex items-start cursor-pointer">
                   <input
                     type="radio"
                     checked={!newBudget.isMonthly}
                     onChange={() => setNewBudget({ ...newBudget, isMonthly: false })}
-                    className="mr-2"
+                    className="mr-2 mt-1"
                   />
-                  Yearly
+                  <div>
+                    <span className="font-medium text-gray-900">Yearly Total</span>
+                    <p className="text-xs text-gray-500">Enter total yearly amount (e.g., 12,000 for Travel)</p>
+                    <p className="text-xs text-gray-500">→ Automatically divided into 12 equal monthly budgets</p>
+                  </div>
                 </label>
-                <label className="flex items-center">
+                <label className="flex items-start cursor-pointer">
                   <input
                     type="radio"
                     checked={newBudget.isMonthly}
                     onChange={() => setNewBudget({ ...newBudget, isMonthly: true })}
-                    className="mr-2"
+                    className="mr-2 mt-1"
                   />
-                  Monthly
+                  <div>
+                    <span className="font-medium text-gray-900">Monthly Recurring</span>
+                    <p className="text-xs text-gray-500">Enter monthly amount (e.g., 1,500 for Groceries)</p>
+                    <p className="text-xs text-gray-500">→ Same amount set for all 12 months</p>
+                  </div>
                 </label>
               </div>
             </div>
