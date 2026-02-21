@@ -6,12 +6,12 @@ interface WizardFormData {
   // Step 1
   annualIncome: number;
 
-  // Step 2
+  // Step 2 - Essential Fixed Costs
   monthlyRent: number;
+  healthInsurance: number;
 
-  // Step 3
+  // Step 3 - Other Essentials
   essentials: {
-    healthInsurance: number;
     carLease: number;
     debtPayments: number;
     otherEssentials: Array<{ category: string; amount: number; isNew: boolean }>;
@@ -46,8 +46,8 @@ interface BudgetWizardProps {
 const initialFormData: WizardFormData = {
   annualIncome: 0,
   monthlyRent: 0,
+  healthInsurance: 0,
   essentials: {
-    healthInsurance: 0,
     carLease: 0,
     debtPayments: 0,
     otherEssentials: [],
@@ -62,6 +62,7 @@ export default function BudgetWizard({ onClose, onSuccess, selectedYear }: Budge
   const [formData, setFormData] = useState<WizardFormData>(initialFormData);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [categories, setCategories] = useState<api.Category[]>([]);
+  const [existingBudgets, setExistingBudgets] = useState<Map<string, number>>(new Map());
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // State for new category inputs
@@ -70,12 +71,13 @@ export default function BudgetWizard({ onClose, onSuccess, selectedYear }: Budge
   const [showNewWantInput, setShowNewWantInput] = useState(false);
   const [newWantName, setNewWantName] = useState('');
 
-  const stepTitles = ['Income', 'Housing', 'Essentials', 'Needs', 'Wants', 'Savings', 'Review'];
+  const stepTitles = ['Income', 'Essentials', 'Other Costs', 'Needs', 'Wants', 'Savings', 'Review'];
 
-  // Load categories on mount
+  // Load categories and existing budgets on mount
   useEffect(() => {
     loadCategories();
-  }, []);
+    loadExistingBudgets();
+  }, [selectedYear]);
 
   const loadCategories = async () => {
     try {
@@ -86,16 +88,33 @@ export default function BudgetWizard({ onClose, onSuccess, selectedYear }: Budge
     }
   };
 
+  const loadExistingBudgets = async () => {
+    try {
+      const budgets = await api.getBudgets(selectedYear);
+      const budgetMap = new Map<string, number>();
+
+      budgets.forEach(budget => {
+        // Store monthly amount (convert from yearly if needed)
+        const monthlyAmount = budget.month === null ? budget.amount / 12 : budget.amount;
+        budgetMap.set(budget.category.toLowerCase(), monthlyAmount);
+      });
+
+      setExistingBudgets(budgetMap);
+    } catch (error) {
+      console.error('Failed to load existing budgets:', error);
+    }
+  };
+
   // Calculated values for Step 7
   const monthlyIncome = useMemo(() => formData.annualIncome / 12, [formData.annualIncome]);
 
   const fixedCosts = useMemo(() => {
     return formData.monthlyRent +
-           formData.essentials.healthInsurance +
+           formData.healthInsurance +
            formData.essentials.carLease +
            formData.essentials.debtPayments +
            formData.essentials.otherEssentials.reduce((sum, e) => sum + e.amount, 0);
-  }, [formData.monthlyRent, formData.essentials]);
+  }, [formData.monthlyRent, formData.healthInsurance, formData.essentials]);
 
   const needsTotal = useMemo(() =>
     formData.needs.reduce((sum, n) => sum + n.monthlyAmount, 0),
@@ -133,7 +152,7 @@ export default function BudgetWizard({ onClose, onSuccess, selectedYear }: Budge
       case 1:
         return formData.annualIncome > 0;
       case 2:
-        return formData.monthlyRent >= 0;
+        return formData.monthlyRent >= 0 && formData.healthInsurance >= 0;
       case 3:
         return formData.essentials.otherEssentials.every(e =>
           e.amount >= 0 && (e.amount === 0 || e.category.trim() !== '')
@@ -226,13 +245,13 @@ export default function BudgetWizard({ onClose, onSuccess, selectedYear }: Budge
       }
 
       // Health Insurance
-      if (formData.essentials.healthInsurance > 0) {
+      if (formData.healthInsurance > 0) {
         budgetsToCreate.push({
           type: 'Expenses',
           category: 'Health Insurance',
           year: selectedYear,
           month: null,
-          amount: formData.essentials.healthInsurance * 12,
+          amount: formData.healthInsurance * 12,
         });
       }
 
@@ -393,50 +412,71 @@ export default function BudgetWizard({ onClose, onSuccess, selectedYear }: Budge
     </div>
   );
 
-  // Step 2: Housing
+  // Step 2: Essential Fixed Costs (Housing + Health Insurance)
   const renderStep2 = () => {
-    const rentPercentage = monthlyIncome > 0 ? (formData.monthlyRent / monthlyIncome) * 100 : 0;
+    const totalEssentialCosts = formData.monthlyRent + formData.healthInsurance;
+    const essentialPercentage = monthlyIncome > 0 ? (totalEssentialCosts / monthlyIncome) * 100 : 0;
 
     return (
       <div className="space-y-6">
         <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-8 rounded-xl">
           <Home className="w-12 h-12 text-green-600 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900 mb-2 text-center">Housing Expenses</h2>
-          <p className="text-gray-600 mb-6 text-center">Enter your monthly rent or mortgage payment</p>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2 text-center">Essential Fixed Costs</h2>
+          <p className="text-gray-600 mb-6 text-center">Your most critical monthly expenses</p>
 
           <div className="max-w-md mx-auto space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Monthly Rent / Mortgage (CHF)
+                Housing (Rent / Mortgage) - CHF
               </label>
               <input
                 type="number"
                 value={formData.monthlyRent || ''}
                 onChange={(e) => setFormData({ ...formData, monthlyRent: Number(e.target.value) })}
-                placeholder="e.g., 1500"
+                placeholder={existingBudgets.has('housing') ? `Suggested: ${existingBudgets.get('housing')?.toFixed(0)}` : 'e.g., 1500'}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Leave at 0 if you own your home outright
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Health Insurance - CHF
+              </label>
+              <input
+                type="number"
+                value={formData.healthInsurance || ''}
+                onChange={(e) => setFormData({ ...formData, healthInsurance: Number(e.target.value) })}
+                placeholder={existingBudgets.has('health insurance') ? `Suggested: ${existingBudgets.get('health insurance')?.toFixed(0)}` : 'e.g., 350'}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
               />
             </div>
 
-            {formData.monthlyRent > 0 && (
+            {totalEssentialCosts > 0 && (
               <div className={`p-4 rounded-lg ${
-                rentPercentage > 40 ? 'bg-red-50 border border-red-200' : 'bg-green-50 border border-green-200'
+                essentialPercentage > 50 ? 'bg-red-50 border border-red-200' : 'bg-green-50 border border-green-200'
               }`}>
-                <p className="text-sm text-gray-600">Percentage of monthly income</p>
-                <p className={`text-xl font-bold ${rentPercentage > 40 ? 'text-red-600' : 'text-green-600'}`}>
-                  {rentPercentage.toFixed(1)}%
-                </p>
-                {rentPercentage > 40 && (
-                  <p className="text-xs text-red-600 mt-2">
-                    ⚠️ Housing costs exceed 40% of income - consider if this is sustainable
-                  </p>
-                )}
+                <div className="space-y-1">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Total Essential Costs:</span>
+                    <span className="font-bold text-gray-900">{formatAmount(totalEssentialCosts)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Percentage of income:</span>
+                    <span className={`font-bold ${essentialPercentage > 50 ? 'text-red-600' : 'text-green-600'}`}>
+                      {essentialPercentage.toFixed(1)}%
+                    </span>
+                  </div>
+                  {essentialPercentage > 50 && (
+                    <p className="text-xs text-red-600 mt-2">
+                      ⚠️ Essential costs exceed 50% of income - this leaves little room for other expenses
+                    </p>
+                  )}
+                </div>
               </div>
             )}
-
-            <p className="text-xs text-gray-500 text-center">
-              Leave at 0 if you don't pay rent or own your home outright
-            </p>
           </div>
         </div>
       </div>
@@ -477,33 +517,17 @@ export default function BudgetWizard({ onClose, onSuccess, selectedYear }: Budge
       });
     };
 
-    const totalEssentials = fixedCosts - formData.monthlyRent;
+    const totalEssentials = fixedCosts - formData.monthlyRent - formData.healthInsurance;
 
     return (
       <div className="space-y-6">
         <div className="bg-gradient-to-br from-orange-50 to-amber-50 p-8 rounded-xl">
           <Heart className="w-12 h-12 text-orange-600 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900 mb-2 text-center">Essential Expenses</h2>
-          <p className="text-gray-600 mb-6 text-center">Fixed costs you must pay every month</p>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2 text-center">Other Costs</h2>
+          <p className="text-gray-600 mb-6 text-center">Additional essential monthly expenses</p>
 
           <div className="max-w-2xl mx-auto space-y-4">
             {/* Fixed essentials */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Health Insurance (monthly)
-              </label>
-              <input
-                type="number"
-                value={formData.essentials.healthInsurance || ''}
-                onChange={(e) => setFormData({
-                  ...formData,
-                  essentials: { ...formData.essentials, healthInsurance: Number(e.target.value) }
-                })}
-                placeholder="e.g., 350"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
-              />
-            </div>
-
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Car Lease / Payment (monthly)
@@ -515,7 +539,7 @@ export default function BudgetWizard({ onClose, onSuccess, selectedYear }: Budge
                   ...formData,
                   essentials: { ...formData.essentials, carLease: Number(e.target.value) }
                 })}
-                placeholder="e.g., 400"
+                placeholder={existingBudgets.has('car') ? `Suggested: ${existingBudgets.get('car')?.toFixed(0)}` : 'e.g., 400'}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
               />
             </div>
@@ -531,7 +555,7 @@ export default function BudgetWizard({ onClose, onSuccess, selectedYear }: Budge
                   ...formData,
                   essentials: { ...formData.essentials, debtPayments: Number(e.target.value) }
                 })}
-                placeholder="e.g., 200"
+                placeholder={existingBudgets.has('debt') ? `Suggested: ${existingBudgets.get('debt')?.toFixed(0)}` : 'e.g., 200'}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
               />
             </div>
@@ -596,14 +620,15 @@ export default function BudgetWizard({ onClose, onSuccess, selectedYear }: Budge
           needs: formData.needs.filter(n => n.categoryId !== categoryId)
         });
       } else {
-        // Add to needs
+        // Add to needs with suggested amount if available
+        const suggestedAmount = existingBudgets.get(categoryName.toLowerCase()) || 0;
         setFormData({
           ...formData,
           needs: [...formData.needs, {
             categoryId,
             categoryName,
             isNew: false,
-            monthlyAmount: 0
+            monthlyAmount: suggestedAmount
           }]
         });
       }
@@ -686,7 +711,14 @@ export default function BudgetWizard({ onClose, onSuccess, selectedYear }: Budge
 
                     {isSelected && (
                       <div className="mt-3">
-                        <label className="block text-xs text-gray-600 mb-1">Monthly amount (CHF)</label>
+                        <label className="block text-xs text-gray-600 mb-1">
+                          Monthly amount (CHF)
+                          {existingBudgets.has(cat.name.toLowerCase()) && (
+                            <span className="ml-2 text-green-600 font-medium">
+                              (Suggested: {existingBudgets.get(cat.name.toLowerCase())?.toFixed(0)})
+                            </span>
+                          )}
+                        </label>
                         <input
                           type="number"
                           placeholder="0"
@@ -797,13 +829,15 @@ export default function BudgetWizard({ onClose, onSuccess, selectedYear }: Budge
           wants: formData.wants.filter(w => w.categoryId !== categoryId)
         });
       } else {
+        // Add to wants with suggested amount if available
+        const suggestedAmount = existingBudgets.get(categoryName.toLowerCase()) || 0;
         setFormData({
           ...formData,
           wants: [...formData.wants, {
             categoryId,
             categoryName,
             isNew: false,
-            monthlyAmount: 0
+            monthlyAmount: suggestedAmount
           }]
         });
       }
@@ -885,7 +919,14 @@ export default function BudgetWizard({ onClose, onSuccess, selectedYear }: Budge
 
                     {isSelected && (
                       <div className="mt-3">
-                        <label className="block text-xs text-gray-600 mb-1">Monthly amount (CHF)</label>
+                        <label className="block text-xs text-gray-600 mb-1">
+                          Monthly amount (CHF)
+                          {existingBudgets.has(cat.name.toLowerCase()) && (
+                            <span className="ml-2 text-green-600 font-medium">
+                              (Suggested: {existingBudgets.get(cat.name.toLowerCase())?.toFixed(0)})
+                            </span>
+                          )}
+                        </label>
                         <input
                           type="number"
                           placeholder="0"
@@ -1126,7 +1167,7 @@ export default function BudgetWizard({ onClose, onSuccess, selectedYear }: Budge
                     <span className="text-gray-600">{formatAmount(formData.monthlyRent)}</span>
                   </div>
                 )}
-                {(formData.essentials.healthInsurance + formData.essentials.carLease + formData.essentials.debtPayments) > 0 && (
+                {(formData.healthInsurance + formData.essentials.carLease + formData.essentials.debtPayments) > 0 && (
                   <div className="flex justify-between text-xs pl-4">
                     <span className="text-gray-500">• Essentials</span>
                     <span className="text-gray-600">
