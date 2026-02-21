@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Calculator, Plus, Trash2, Save, DollarSign, FolderPlus, Edit2, X, Sparkles, TrendingUp } from 'lucide-react';
+import { Calculator, Plus, Trash2, Save, DollarSign, FolderPlus, Edit2, X, Sparkles } from 'lucide-react';
 import type { BudgetPlan, CategoryInfo } from '../types';
 import * as api from '../api';
+import BudgetWizard from '../components/BudgetWizard';
 
 interface BudgetRow {
   type: string;
@@ -42,16 +43,8 @@ export default function BudgetPlanningPage() {
   });
   const [editingCategory, setEditingCategory] = useState<api.Category | null>(null);
 
-  // Budget Helper Tool (Beta)
-  const [showBudgetHelper, setShowBudgetHelper] = useState(false);
-  const [helperIncome, setHelperIncome] = useState<number>(0);
-  const [helperAllocations, setHelperAllocations] = useState({
-    housing: 0,
-    healthInsurance: 0,
-    groceries: 0,
-    tax: 0,
-    trading: 0,
-  });
+  // Budget Wizard
+  const [showWizard, setShowWizard] = useState(false);
 
   const months = [
     'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
@@ -159,89 +152,6 @@ export default function BudgetPlanningPage() {
       console.error('Failed to toggle category status:', error);
       alert(error.response?.data?.detail || 'Failed to update category');
     }
-  };
-
-  // Budget Helper Functions
-  const calculateHelperPercentage = (amount: number): number => {
-    if (helperIncome <= 0) return 0;
-    return (amount / helperIncome) * 100;
-  };
-
-  const calculateHelperRemaining = (): number => {
-    const total = Object.values(helperAllocations).reduce((sum, val) => sum + val, 0);
-    return helperIncome - total;
-  };
-
-  const handleHelperAllocationChange = (category: keyof typeof helperAllocations, value: number) => {
-    setHelperAllocations({
-      ...helperAllocations,
-      [category]: value >= 0 ? value : 0,
-    });
-  };
-
-  const handleApplyHelperToMonthlyBudget = async () => {
-    if (helperIncome <= 0) {
-      alert('Please enter your monthly income first');
-      return;
-    }
-
-    const remaining = calculateHelperRemaining();
-    if (remaining < 0) {
-      alert(`Your allocations exceed your income by CHF ${Math.abs(remaining).toFixed(2)}. Please adjust.`);
-      return;
-    }
-
-    if (!confirm('This will create monthly budgets for the selected categories. Continue?')) {
-      return;
-    }
-
-    try {
-      setSaving(true);
-
-      // Map helper categories to actual budget categories
-      const categoryMapping = {
-        housing: 'Housing',
-        healthInsurance: 'Health Insurance',
-        groceries: 'Groceries',
-        tax: 'Tax',
-        trading: 'Stock Portofolio', // or could be 'Savings'
-      };
-
-      // Create budgets for non-zero allocations
-      for (const [key, category] of Object.entries(categoryMapping)) {
-        const amount = helperAllocations[key as keyof typeof helperAllocations];
-        if (amount > 0) {
-          const type = key === 'trading' ? 'Savings' : 'Expenses';
-          await api.createBudget({
-            type,
-            category,
-            year: selectedYear,
-            month: null, // Yearly budget (could be changed to monthly)
-            amount: amount * 12, // Convert monthly to yearly
-          });
-        }
-      }
-
-      alert('Budget allocations applied successfully!');
-      setShowBudgetHelper(false);
-      await loadBudgets();
-    } catch (error: any) {
-      console.error('Failed to apply budget allocations:', error);
-      alert(error.response?.data?.detail || 'Failed to apply budget allocations');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const resetBudgetHelper = () => {
-    setHelperIncome(0);
-    setHelperAllocations({
-      housing: 0,
-      healthInsurance: 0,
-      groceries: 0,
-      tax: 0,
-      trading: 0,
-    });
   };
 
   const loadBudgets = async () => {
@@ -487,12 +397,11 @@ export default function BudgetPlanningPage() {
           </button>
 
           <button
-            onClick={() => setShowBudgetHelper(true)}
-            className="mt-5 px-4 py-2 bg-gradient-to-r from-orange-500 to-pink-500 text-white rounded-lg font-medium hover:from-orange-600 hover:to-pink-600 flex items-center relative"
+            onClick={() => setShowWizard(true)}
+            className="mt-5 px-4 py-2 bg-gradient-to-r from-green-500 to-teal-500 text-white rounded-lg font-medium hover:from-green-600 hover:to-teal-600 flex items-center relative"
           >
             <Sparkles className="w-4 h-4 mr-2" />
-            Budget Helper
-            <span className="ml-2 text-xs px-1.5 py-0.5 bg-white/20 rounded">BETA</span>
+            Budget Wizard
           </button>
 
           <button
@@ -949,230 +858,18 @@ export default function BudgetPlanningPage() {
         </div>
       )}
 
-      {/* Budget Helper Modal (BETA) */}
-      {showBudgetHelper && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-gradient-to-r from-orange-500 to-pink-500 rounded-lg">
-                    <Sparkles className="w-5 h-5 text-white" />
-                  </div>
-                  <div>
-                    <h2 className="text-xl font-bold text-gray-900">Budget Helper</h2>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-xs px-2 py-0.5 bg-gradient-to-r from-orange-500 to-pink-500 text-white rounded">
-                        BETA
-                      </span>
-                      <span className="text-xs text-gray-500">
-                        Quickly allocate your monthly income
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                <button
-                  onClick={() => {
-                    setShowBudgetHelper(false);
-                    resetBudgetHelper();
-                  }}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-
-            <div className="p-6 space-y-6">
-              {/* Monthly Income Input */}
-              <div className="bg-gradient-to-r from-orange-50 to-pink-50 p-4 rounded-lg border border-orange-200">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Monthly Income (CHF)
-                </label>
-                <input
-                  type="number"
-                  value={helperIncome || ''}
-                  onChange={(e) => setHelperIncome(parseFloat(e.target.value) || 0)}
-                  placeholder="Enter your monthly income"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                  min="0"
-                  step="0.01"
-                />
-              </div>
-
-              {/* Allocation Inputs */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                  <TrendingUp className="w-5 h-5 text-orange-500" />
-                  Allocate Your Budget
-                </h3>
-
-                {/* Housing */}
-                <div className="bg-white p-4 rounded-lg border border-gray-200">
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="text-sm font-medium text-gray-700">
-                      Housing (Rent)
-                    </label>
-                    <span className="text-xs font-medium text-orange-600">
-                      {calculateHelperPercentage(helperAllocations.housing).toFixed(1)}%
-                    </span>
-                  </div>
-                  <input
-                    type="number"
-                    value={helperAllocations.housing || ''}
-                    onChange={(e) => handleHelperAllocationChange('housing', parseFloat(e.target.value) || 0)}
-                    placeholder="0.00"
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                    min="0"
-                    step="0.01"
-                  />
-                </div>
-
-                {/* Health Insurance */}
-                <div className="bg-white p-4 rounded-lg border border-gray-200">
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="text-sm font-medium text-gray-700">
-                      Health Insurance
-                    </label>
-                    <span className="text-xs font-medium text-orange-600">
-                      {calculateHelperPercentage(helperAllocations.healthInsurance).toFixed(1)}%
-                    </span>
-                  </div>
-                  <input
-                    type="number"
-                    value={helperAllocations.healthInsurance || ''}
-                    onChange={(e) => handleHelperAllocationChange('healthInsurance', parseFloat(e.target.value) || 0)}
-                    placeholder="0.00"
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                    min="0"
-                    step="0.01"
-                  />
-                </div>
-
-                {/* Groceries */}
-                <div className="bg-white p-4 rounded-lg border border-gray-200">
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="text-sm font-medium text-gray-700">
-                      Groceries
-                    </label>
-                    <span className="text-xs font-medium text-orange-600">
-                      {calculateHelperPercentage(helperAllocations.groceries).toFixed(1)}%
-                    </span>
-                  </div>
-                  <input
-                    type="number"
-                    value={helperAllocations.groceries || ''}
-                    onChange={(e) => handleHelperAllocationChange('groceries', parseFloat(e.target.value) || 0)}
-                    placeholder="0.00"
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                    min="0"
-                    step="0.01"
-                  />
-                </div>
-
-                {/* Tax */}
-                <div className="bg-white p-4 rounded-lg border border-gray-200">
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="text-sm font-medium text-gray-700">
-                      Tax
-                    </label>
-                    <span className="text-xs font-medium text-orange-600">
-                      {calculateHelperPercentage(helperAllocations.tax).toFixed(1)}%
-                    </span>
-                  </div>
-                  <input
-                    type="number"
-                    value={helperAllocations.tax || ''}
-                    onChange={(e) => handleHelperAllocationChange('tax', parseFloat(e.target.value) || 0)}
-                    placeholder="0.00"
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                    min="0"
-                    step="0.01"
-                  />
-                </div>
-
-                {/* Trading/Wealth */}
-                <div className="bg-white p-4 rounded-lg border border-gray-200">
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="text-sm font-medium text-gray-700">
-                      Trading/Wealth
-                    </label>
-                    <span className="text-xs font-medium text-orange-600">
-                      {calculateHelperPercentage(helperAllocations.trading).toFixed(1)}%
-                    </span>
-                  </div>
-                  <input
-                    type="number"
-                    value={helperAllocations.trading || ''}
-                    onChange={(e) => handleHelperAllocationChange('trading', parseFloat(e.target.value) || 0)}
-                    placeholder="0.00"
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                    min="0"
-                    step="0.01"
-                  />
-                </div>
-              </div>
-
-              {/* Summary */}
-              <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                <h4 className="text-sm font-semibold text-gray-700 mb-3">Summary</h4>
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Total Allocated:</span>
-                    <span className="font-medium text-gray-900">
-                      CHF {(Object.values(helperAllocations).reduce((sum, val) => sum + val, 0)).toFixed(2)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-sm pt-2 border-t border-gray-300">
-                    <span className="text-gray-600 font-medium">Remaining:</span>
-                    <span className={`font-bold ${calculateHelperRemaining() >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      CHF {calculateHelperRemaining().toFixed(2)}
-                    </span>
-                  </div>
-                  {calculateHelperRemaining() < 0 && (
-                    <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700">
-                      ⚠️ Your allocations exceed your income!
-                    </div>
-                  )}
-                  {helperIncome > 0 && calculateHelperRemaining() >= 0 && (
-                    <div className="mt-2 text-xs text-gray-500">
-                      You're using {((1 - calculateHelperRemaining() / helperIncome) * 100).toFixed(1)}% of your income
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="px-6 py-4 border-t border-gray-200 flex justify-between">
-              <button
-                onClick={resetBudgetHelper}
-                className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors font-medium"
-              >
-                Reset
-              </button>
-              <div className="flex gap-3">
-                <button
-                  onClick={() => {
-                    setShowBudgetHelper(false);
-                    resetBudgetHelper();
-                  }}
-                  className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-medium"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleApplyHelperToMonthlyBudget}
-                  disabled={helperIncome <= 0}
-                  className="px-4 py-2 bg-gradient-to-r from-orange-500 to-pink-500 text-white rounded-lg font-medium hover:from-orange-600 hover:to-pink-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Apply to Budget
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+      {/* Budget Wizard */}
+      {showWizard && (
+        <BudgetWizard
+          onClose={() => setShowWizard(false)}
+          onSuccess={() => {
+            loadBudgets();
+            setShowWizard(false);
+          }}
+          selectedYear={selectedYear}
+        />
       )}
+
     </div>
   );
 }
