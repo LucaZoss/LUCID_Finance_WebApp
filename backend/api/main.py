@@ -71,7 +71,7 @@ def get_available_years(
     session: Session = Depends(get_db)
 ):
     """Get list of years with transaction data."""
-    from .data_pipeline.models import Transaction
+    from ..data_pipeline.models import Transaction
     years = session.query(Transaction.year).filter(
         Transaction.user_id == current_user["id"]
     ).distinct().order_by(Transaction.year.desc()).all()
