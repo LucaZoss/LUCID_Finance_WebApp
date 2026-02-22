@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { Upload, PieChart, Calculator, Menu, X, LogOut, User, Filter, Download, ChevronDown, Users } from 'lucide-react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import TransactionsPage from './pages/TransactionsPage';
@@ -9,10 +10,38 @@ import RulesPage from './pages/RulesPage';
 import UserManagementPage from './pages/UserManagementPage';
 import { downloadExcel, getAvailableYears } from './api';
 
-type Page = 'transactions' | 'planning' | 'dashboard' | 'rules' | 'user-management';
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated, isLoading } = useAuth();
 
-function AppContent() {
-  const [currentPage, setCurrentPage] = useState<Page>('dashboard');
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return <>{children}</>;
+}
+
+function AdminRoute({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
+
+  if (!user?.is_admin) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return <>{children}</>;
+}
+
+function AppLayout() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [exportModalOpen, setExportModalOpen] = useState(false);
@@ -20,7 +49,9 @@ function AppContent() {
   const [exportYear, setExportYear] = useState<number>(new Date().getFullYear());
   const [exportMonth, setExportMonth] = useState<number | undefined>(undefined);
   const [downloading, setDownloading] = useState(false);
-  const { isAuthenticated, isLoading, user, logout } = useAuth();
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
   const userMenuRef = useRef<HTMLDivElement>(null);
 
   // Close dropdown when clicking outside
@@ -42,10 +73,8 @@ function AppContent() {
 
   // Load available years
   useEffect(() => {
-    if (isAuthenticated) {
-      getAvailableYears().then(setAvailableYears).catch(console.error);
-    }
-  }, [isAuthenticated]);
+    getAvailableYears().then(setAvailableYears).catch(console.error);
+  }, []);
 
   // Handle Excel export
   const handleExport = async () => {
@@ -62,44 +91,14 @@ function AppContent() {
     }
   };
 
-  // Show loading state
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Show login page if not authenticated
-  if (!isAuthenticated) {
-    return <LoginPage />;
-  }
-
   const navItems = [
-    { id: 'dashboard' as Page, label: 'Dashboard', icon: PieChart },
-    { id: 'transactions' as Page, label: 'Transactions', icon: Upload },
-    { id: 'planning' as Page, label: 'Budget Planning', icon: Calculator },
-    { id: 'rules' as Page, label: 'Rules', icon: Filter },
+    { path: '/dashboard', label: 'Dashboard', icon: PieChart },
+    { path: '/transactions', label: 'Transactions', icon: Upload },
+    { path: '/planning', label: 'Budget Planning', icon: Calculator },
+    { path: '/rules', label: 'Rules', icon: Filter },
   ];
 
-  const renderPage = () => {
-    switch (currentPage) {
-      case 'transactions':
-        return <TransactionsPage />;
-      case 'planning':
-        return <BudgetPlanningPage />;
-      case 'dashboard':
-        return <DashboardPage />;
-      case 'rules':
-        return <RulesPage />;
-      case 'user-management':
-        return <UserManagementPage />;
-    }
-  };
+  const isActivePath = (path: string) => location.pathname === path;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -117,10 +116,10 @@ function AppContent() {
               <nav className="flex space-x-1">
                 {navItems.map((item) => (
                   <button
-                    key={item.id}
-                    onClick={() => setCurrentPage(item.id)}
+                    key={item.path}
+                    onClick={() => navigate(item.path)}
                     className={`flex items-center px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                      currentPage === item.id
+                      isActivePath(item.path)
                         ? 'bg-blue-100 text-blue-700'
                         : 'text-gray-600 hover:bg-gray-100'
                     }`}
@@ -154,7 +153,7 @@ function AppContent() {
                       <>
                         <button
                           onClick={() => {
-                            setCurrentPage('user-management');
+                            navigate('/user-management');
                             setUserMenuOpen(false);
                           }}
                           className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
@@ -207,13 +206,13 @@ function AppContent() {
             <div className="px-4 py-2 space-y-1">
               {navItems.map((item) => (
                 <button
-                  key={item.id}
+                  key={item.path}
                   onClick={() => {
-                    setCurrentPage(item.id);
+                    navigate(item.path);
                     setMobileMenuOpen(false);
                   }}
                   className={`flex items-center w-full px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
-                    currentPage === item.id
+                    isActivePath(item.path)
                       ? 'bg-blue-100 text-blue-700'
                       : 'text-gray-600 hover:bg-gray-100'
                   }`}
@@ -239,7 +238,7 @@ function AppContent() {
                 {user?.is_admin && (
                   <button
                     onClick={() => {
-                      setCurrentPage('user-management');
+                      navigate('/user-management');
                       setMobileMenuOpen(false);
                     }}
                     className="flex items-center w-full px-4 py-3 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100"
@@ -276,7 +275,21 @@ function AppContent() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {renderPage()}
+        <Routes>
+          <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/transactions" element={<TransactionsPage />} />
+          <Route path="/planning" element={<BudgetPlanningPage />} />
+          <Route path="/rules" element={<RulesPage />} />
+          <Route
+            path="/user-management"
+            element={
+              <AdminRoute>
+                <UserManagementPage />
+              </AdminRoute>
+            }
+          />
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        </Routes>
       </main>
 
       {/* Export Excel Modal */}
@@ -367,11 +380,51 @@ function AppContent() {
   );
 }
 
+function AppContent() {
+  const { isAuthenticated, isLoading } = useAuth();
+  const location = useLocation();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated && location.pathname !== '/login') {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (isAuthenticated && location.pathname === '/login') {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return (
+    <Routes>
+      <Route path="/login" element={<LoginPage />} />
+      <Route
+        path="/*"
+        element={
+          <ProtectedRoute>
+            <AppLayout />
+          </ProtectedRoute>
+        }
+      />
+    </Routes>
+  );
+}
+
 function App() {
   return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
+    <BrowserRouter>
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
+    </BrowserRouter>
   );
 }
 
