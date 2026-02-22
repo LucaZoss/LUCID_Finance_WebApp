@@ -1,14 +1,15 @@
 import { useState, useEffect, useRef } from 'react';
-import { Upload, PieChart, Calculator, Menu, X, LogOut, User, Filter, Download, ChevronDown } from 'lucide-react';
+import { Upload, PieChart, Calculator, Menu, X, LogOut, User, Filter, Download, ChevronDown, Users } from 'lucide-react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import TransactionsPage from './pages/TransactionsPage';
 import BudgetPlanningPage from './pages/BudgetPlanningPage';
 import DashboardPage from './pages/DashboardPage';
 import LoginPage from './pages/LoginPage';
 import RulesPage from './pages/RulesPage';
+import UserManagementPage from './pages/UserManagementPage';
 import { downloadExcel, getAvailableYears } from './api';
 
-type Page = 'transactions' | 'planning' | 'dashboard' | 'rules';
+type Page = 'transactions' | 'planning' | 'dashboard' | 'rules' | 'user-management';
 
 function AppContent() {
   const [currentPage, setCurrentPage] = useState<Page>('dashboard');
@@ -95,6 +96,8 @@ function AppContent() {
         return <DashboardPage />;
       case 'rules':
         return <RulesPage />;
+      case 'user-management':
+        return <UserManagementPage />;
     }
   };
 
@@ -147,6 +150,21 @@ function AppContent() {
                 {/* Dropdown menu */}
                 {userMenuOpen && (
                   <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
+                    {user?.is_admin && (
+                      <>
+                        <button
+                          onClick={() => {
+                            setCurrentPage('user-management');
+                            setUserMenuOpen(false);
+                          }}
+                          className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                        >
+                          <Users className="w-4 h-4 mr-2" />
+                          User Management
+                        </button>
+                        <div className="border-t border-gray-200 my-1"></div>
+                      </>
+                    )}
                     <button
                       onClick={() => {
                         setExportModalOpen(true);
@@ -218,6 +236,18 @@ function AppContent() {
                     )}
                   </div>
                 </div>
+                {user?.is_admin && (
+                  <button
+                    onClick={() => {
+                      setCurrentPage('user-management');
+                      setMobileMenuOpen(false);
+                    }}
+                    className="flex items-center w-full px-4 py-3 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100"
+                  >
+                    <Users className="w-4 h-4 mr-2" />
+                    User Management
+                  </button>
+                )}
                 <button
                   onClick={() => {
                     setExportModalOpen(true);
