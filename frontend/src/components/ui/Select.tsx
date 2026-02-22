@@ -38,7 +38,7 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
       props.id || props.name || `select-${Math.random().toString(36).substring(7)}`;
 
     const selectClasses = [
-      'px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 transition-colors appearance-none bg-white',
+      'pl-3 pr-10 py-2 border rounded-lg focus:outline-none focus:ring-2 transition-colors appearance-none bg-white',
       hasError
         ? 'border-red-500 focus:border-red-500 focus:ring-red-200'
         : 'border-gray-300 focus:border-blue-500 focus:ring-blue-200',
