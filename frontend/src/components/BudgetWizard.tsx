@@ -259,17 +259,8 @@ export default function BudgetWizard({ onClose, onSuccess, selectedYear }: Budge
         }
       });
 
-      // Savings (automatic - calculated from remaining balance)
-      if (monthlySavings > 0) {
-        budgetsToCreate.push({
-          type: 'Savings',
-          category: 'General Savings',
-          sub_type: null,
-          year: selectedYear,
-          month: null,
-          amount: monthlySavings * 12,
-        });
-      }
+      // Note: Remaining balance is NOT automatically saved as "General Savings"
+      // Users should manually create specific savings budgets if needed
 
       // Create all budgets
       for (const budget of budgetsToCreate) {
