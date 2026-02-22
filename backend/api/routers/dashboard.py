@@ -138,8 +138,8 @@ def get_dashboard_summary(
     total_savings_actual = sum(i.actual for i in savings_summary)
     total_savings_budget = sum(i.budget for i in savings_summary)
 
-    # Calculate Fixed Cost Ratio = (Housing + Health + Tax) / Total Income
-    fixed_cost_categories = ["Housing", "Health Insurance", "Health Other", "Tax"]
+    # Calculate Fixed Cost Ratio = (Housing + Health Insurance + Needs) / Total Income
+    fixed_cost_categories = ["Housing", "Health Insurance", "Needs"]
     total_fixed_costs = sum(
         item.actual for item in expense_summary
         if item.category in fixed_cost_categories

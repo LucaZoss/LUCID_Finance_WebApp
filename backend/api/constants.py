@@ -4,7 +4,7 @@ Extracted from main.py for better organization.
 """
 
 # Fixed cost categories for budget analysis
-FIXED_COST_CATEGORIES = ["Housing", "Health Insurance", "Health Other", "Tax"]
+FIXED_COST_CATEGORIES = ["Housing", "Health Insurance", "Needs"]
 
 # Pagination defaults
 DEFAULT_PAGE_SIZE = 500
