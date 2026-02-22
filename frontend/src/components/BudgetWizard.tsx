@@ -1,6 +1,8 @@
 import { useState, useMemo, useEffect } from 'react';
-import { X, ChevronLeft, ChevronRight, Check, DollarSign, Home, ShoppingCart, Smile, PiggyBank, TrendingUp, Plus, Trash2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Check, DollarSign, Home, ShoppingCart, Smile, TrendingUp, Plus, Trash2 } from 'lucide-react';
 import * as api from '../api';
+import { formatAmount } from '../utils/formatters';
+import { Button, Modal, ModalFooter } from './ui';
 
 interface WizardFormData {
   // Step 1
@@ -25,9 +27,6 @@ interface WizardFormData {
     isNew: boolean;
     monthlyAmount: number;
   }>;
-
-  // Step 5 - Savings Goal
-  annualSavingsGoal: number;
 }
 
 interface BudgetWizardProps {
@@ -42,7 +41,6 @@ const initialFormData: WizardFormData = {
   healthInsurance: 0,
   needs: [],
   wants: [],
-  annualSavingsGoal: 0,
 };
 
 export default function BudgetWizard({ onClose, onSuccess, selectedYear }: BudgetWizardProps) {
@@ -59,7 +57,7 @@ export default function BudgetWizard({ onClose, onSuccess, selectedYear }: Budge
   const [showNewWantInput, setShowNewWantInput] = useState(false);
   const [newWantName, setNewWantName] = useState('');
 
-  const stepTitles = ['Income', 'Essentials', 'Needs', 'Wants', 'Savings', 'Review'];
+  const stepTitles = ['Income', 'Essentials', 'Needs', 'Wants', 'Review'];
 
   // Load categories and existing budgets on mount
   useEffect(() => {
@@ -110,25 +108,23 @@ export default function BudgetWizard({ onClose, onSuccess, selectedYear }: Budge
     [formData.wants]
   );
 
+  // Automatic savings calculation (what's left after all expenses)
   const monthlySavings = useMemo(() =>
-    formData.annualSavingsGoal / 12,
-    [formData.annualSavingsGoal]
+    monthlyIncome - fixedCosts - needsTotal - wantsTotal,
+    [monthlyIncome, fixedCosts, needsTotal, wantsTotal]
   );
 
-  const remainingBalance = useMemo(() =>
-    monthlyIncome - fixedCosts - needsTotal - wantsTotal - monthlySavings,
-    [monthlyIncome, fixedCosts, needsTotal, wantsTotal, monthlySavings]
+  // Savings percentage (color-coded in Review step)
+  const savingsPercentage = useMemo(() =>
+    monthlyIncome > 0 ? (monthlySavings / monthlyIncome) * 100 : 0,
+    [monthlySavings, monthlyIncome]
   );
 
-  // Format currency
-  const formatAmount = (amount: number): string => {
-    return new Intl.NumberFormat('de-CH', {
-      style: 'currency',
-      currency: 'CHF',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
-  };
+  // Fixed Cost Ratio: (Housing + Health Insurance + Needs) / Income
+  const fixedCostRatio = useMemo(() =>
+    monthlyIncome > 0 ? ((fixedCosts + needsTotal) / monthlyIncome) * 100 : 0,
+    [fixedCosts, needsTotal, monthlyIncome]
+  );
 
   // Validation functions
   const canProceed = (step: number): boolean => {
@@ -143,9 +139,7 @@ export default function BudgetWizard({ onClose, onSuccess, selectedYear }: Budge
       case 4:
         return formData.wants.every(w => w.monthlyAmount >= 0);
       case 5:
-        return formData.annualSavingsGoal >= 0;
-      case 6:
-        return true;
+        return true; // Review step
       default:
         return false;
     }
@@ -158,7 +152,7 @@ export default function BudgetWizard({ onClose, onSuccess, selectedYear }: Budge
     }
 
     setValidationErrors({});
-    setCurrentStep(prev => Math.min(prev + 1, 6));
+    setCurrentStep(prev => Math.min(prev + 1, 5));
   };
 
   const handleBack = () => {
@@ -260,14 +254,14 @@ export default function BudgetWizard({ onClose, onSuccess, selectedYear }: Budge
         }
       });
 
-      // Savings
-      if (formData.annualSavingsGoal > 0) {
+      // Savings (automatic - calculated from remaining balance)
+      if (monthlySavings > 0) {
         budgetsToCreate.push({
           type: 'Savings',
           category: 'General Savings',
           year: selectedYear,
           month: null,
-          amount: formData.annualSavingsGoal,
+          amount: monthlySavings * 12,
         });
       }
 
@@ -864,90 +858,9 @@ export default function BudgetWizard({ onClose, onSuccess, selectedYear }: Budge
     );
   };
 
-  // Step 5: Savings Goal (renamed from Step 6)
+  // Step 5: Review & Adjust (automatic savings calculation)
   const renderStep5 = () => {
-    const savingsPercentage = formData.annualIncome > 0 ?
-      (formData.annualSavingsGoal / formData.annualIncome) * 100 : 0;
-
-    const setSavingsPreset = (percentage: number) => {
-      setFormData({
-        ...formData,
-        annualSavingsGoal: Math.round(formData.annualIncome * percentage)
-      });
-    };
-
-    return (
-      <div className="space-y-6">
-        <div className="bg-gradient-to-br from-green-50 to-teal-50 p-8 rounded-xl">
-          <PiggyBank className="w-12 h-12 text-green-600 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900 mb-2 text-center">Savings Goal</h2>
-          <p className="text-gray-600 mb-6 text-center">
-            How much do you want to save annually?
-          </p>
-
-          <div className="max-w-md mx-auto space-y-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Annual Savings Goal (CHF)
-              </label>
-              <input
-                type="number"
-                value={formData.annualSavingsGoal || ''}
-                onChange={(e) => setFormData({ ...formData, annualSavingsGoal: Number(e.target.value) })}
-                placeholder="e.g., 12000"
-                className="w-full px-4 py-3 border-2 border-green-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-lg"
-              />
-            </div>
-
-            {formData.annualSavingsGoal > 0 && (
-              <div className="bg-white p-4 rounded-lg space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Monthly savings:</span>
-                  <span className="font-bold text-green-600">{formatAmount(monthlySavings)}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Percentage of income:</span>
-                  <span className="font-bold text-green-600">{savingsPercentage.toFixed(1)}%</span>
-                </div>
-              </div>
-            )}
-
-            {/* Quick preset buttons */}
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-gray-700">Quick presets:</p>
-              <div className="grid grid-cols-3 gap-2">
-                <button
-                  onClick={() => setSavingsPreset(0.10)}
-                  className="px-4 py-2 border-2 border-green-300 text-green-700 rounded-lg hover:bg-green-50 transition-colors font-medium"
-                >
-                  10%
-                </button>
-                <button
-                  onClick={() => setSavingsPreset(0.20)}
-                  className="px-4 py-2 border-2 border-green-400 text-green-700 rounded-lg hover:bg-green-50 transition-colors font-medium"
-                >
-                  20%
-                </button>
-                <button
-                  onClick={() => setSavingsPreset(0.30)}
-                  className="px-4 py-2 border-2 border-green-500 text-green-700 rounded-lg hover:bg-green-50 transition-colors font-medium"
-                >
-                  30%
-                </button>
-              </div>
-              <p className="text-xs text-gray-500 text-center mt-2">
-                Financial experts recommend saving 20-30% of income
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  // Step 6: Review & Adjust (renamed from Step 7)
-  const renderStep6 = () => {
-    const handleAllocationChange = (category: 'needs' | 'wants' | 'savings', newTotal: number) => {
+    const handleAllocationChange = (category: 'needs' | 'wants', newTotal: number) => {
       if (category === 'needs' && needsTotal > 0) {
         const ratio = newTotal / needsTotal;
         setFormData({
@@ -966,12 +879,20 @@ export default function BudgetWizard({ onClose, onSuccess, selectedYear }: Budge
             monthlyAmount: Math.round(w.monthlyAmount * ratio * 100) / 100
           }))
         });
-      } else if (category === 'savings') {
-        setFormData({
-          ...formData,
-          annualSavingsGoal: newTotal * 12
-        });
       }
+    };
+
+    // Get color for savings percentage
+    const getSavingsColor = () => {
+      if (savingsPercentage >= 30) return 'bg-green-50 border-green-300 text-green-700';
+      if (savingsPercentage >= 0) return 'bg-yellow-50 border-yellow-300 text-yellow-700';
+      return 'bg-red-50 border-red-300 text-red-700';
+    };
+
+    const getSavingsTextColor = () => {
+      if (savingsPercentage >= 30) return 'text-green-700';
+      if (savingsPercentage >= 0) return 'text-yellow-700';
+      return 'text-red-700';
     };
 
     return (
@@ -1057,51 +978,52 @@ export default function BudgetWizard({ onClose, onSuccess, selectedYear }: Budge
                     className="w-full h-2 bg-purple-200 rounded-lg appearance-none cursor-pointer accent-purple-600"
                   />
                 </div>
+              </div>
 
-                {/* Savings */}
-                <div className="space-y-2">
+              {/* Automatic Savings Display */}
+              <div className={`mt-6 p-4 rounded-lg border-2 ${getSavingsColor()}`}>
+                <div className="space-y-3">
                   <div className="flex justify-between items-center">
-                    <label className="font-medium text-gray-700">Savings</label>
-                    <input
-                      type="number"
-                      value={Math.round(monthlySavings)}
-                      onChange={(e) => handleAllocationChange('savings', Number(e.target.value))}
-                      className="w-32 px-3 py-1 text-right border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
-                    />
+                    <span className="font-semibold text-gray-900">Annual Savings</span>
+                    <span className={`text-3xl font-bold ${getSavingsTextColor()}`}>
+                      {formatAmount(monthlySavings * 12)}
+                    </span>
                   </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max={monthlyIncome - fixedCosts}
-                    value={monthlySavings}
-                    onChange={(e) => handleAllocationChange('savings', Number(e.target.value))}
-                    className="w-full h-2 bg-green-200 rounded-lg appearance-none cursor-pointer accent-green-600"
-                  />
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-gray-700">Savings Rate (% of yearly income):</span>
+                    <span className={`text-xl font-bold ${getSavingsTextColor()}`}>
+                      {savingsPercentage.toFixed(1)}%
+                    </span>
+                  </div>
+                  {savingsPercentage >= 30 && (
+                    <p className="text-sm text-green-700">
+                      ✓ Excellent! You're saving 30%+ of your income.
+                    </p>
+                  )}
+                  {savingsPercentage >= 0 && savingsPercentage < 30 && (
+                    <p className="text-sm text-yellow-700">
+                      Good start! Consider reducing wants to increase savings to 30%.
+                    </p>
+                  )}
+                  {savingsPercentage < 0 && (
+                    <p className="text-sm text-red-700">
+                      ⚠️ Negative savings! You're spending more than you earn.
+                    </p>
+                  )}
                 </div>
               </div>
 
-              {/* Remaining balance */}
-              <div className={`mt-6 p-4 rounded-lg ${
-                remainingBalance >= 0 ? 'bg-green-50 border-2 border-green-300' : 'bg-red-50 border-2 border-red-300'
-              }`}>
+              {/* Fixed Cost Ratio */}
+              <div className="mt-4 p-4 bg-blue-50 border-2 border-blue-200 rounded-lg">
                 <div className="flex justify-between items-center">
-                  <span className="font-semibold text-gray-900">Remaining Balance</span>
-                  <span className={`text-3xl font-bold ${
-                    remainingBalance >= 0 ? 'text-green-700' : 'text-red-700'
-                  }`}>
-                    {formatAmount(remainingBalance)}
+                  <span className="font-semibold text-gray-900">Fixed Cost Ratio</span>
+                  <span className="text-xl font-bold text-blue-700">
+                    {fixedCostRatio.toFixed(1)}%
                   </span>
                 </div>
-                {remainingBalance < 0 && (
-                  <p className="text-sm text-red-700 mt-2">
-                    ⚠️ You've allocated more than your income! Adjust your budget or you won't be able to proceed.
-                  </p>
-                )}
-                {remainingBalance >= 0 && remainingBalance < 100 && (
-                  <p className="text-sm text-green-700 mt-2">
-                    ✓ Perfect! You've allocated almost all your income.
-                  </p>
-                )}
+                <p className="text-xs text-gray-600 mt-1">
+                  (Housing + Health Insurance + Needs) / Income
+                </p>
               </div>
             </div>
 
@@ -1131,24 +1053,19 @@ export default function BudgetWizard({ onClose, onSuccess, selectedYear }: Budge
       case 3: return renderStep3();
       case 4: return renderStep4();
       case 5: return renderStep5();
-      case 6: return renderStep6();
       default: return null;
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-        {/* Header */}
-        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-          <h1 className="text-xl font-bold text-gray-900">Budget Wizard</h1>
-          <button
-            onClick={handleClose}
-            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+    <Modal
+      isOpen={true}
+      onClose={handleClose}
+      title="Budget Wizard"
+      maxWidth="4xl"
+      showCloseButton={true}
+    >
+      <div className="flex flex-col max-h-[calc(90vh-8rem)]">{/* Adjusted for modal header height */}
 
         {/* Progress Indicator */}
         <div className="px-6 py-6 border-b border-gray-200">
@@ -1161,39 +1078,40 @@ export default function BudgetWizard({ onClose, onSuccess, selectedYear }: Budge
         </div>
 
         {/* Footer Navigation */}
-        <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between bg-gray-50">
-          <button
+        <ModalFooter className="bg-gray-50 flex items-center justify-between">
+          <Button
+            variant="outline"
             onClick={handleBack}
             disabled={currentStep === 1}
-            className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+            className="flex items-center"
           >
             <ChevronLeft className="w-4 h-4 mr-1" />
             Back
-          </button>
+          </Button>
 
           <div className="text-sm text-gray-600">
-            Step {currentStep} of 6
+            Step {currentStep} of 5
           </div>
 
-          {currentStep < 6 ? (
-            <button
+          {currentStep < 5 ? (
+            <Button
               onClick={handleNext}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center"
+              className="flex items-center"
             >
               Next
               <ChevronRight className="w-4 h-4 ml-1" />
-            </button>
+            </Button>
           ) : (
-            <button
+            <Button
+              variant="success"
               onClick={handleSubmit}
-              disabled={isSubmitting || remainingBalance < 0}
-              className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
+              isLoading={isSubmitting}
             >
               {isSubmitting ? 'Creating Budgets...' : 'Create Budget'}
-            </button>
+            </Button>
           )}
-        </div>
+        </ModalFooter>
       </div>
-    </div>
+    </Modal>
   );
 }

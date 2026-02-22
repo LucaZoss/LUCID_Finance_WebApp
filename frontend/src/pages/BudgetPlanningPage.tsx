@@ -3,6 +3,12 @@ import { Calculator, Plus, Trash2, Save, DollarSign, FolderPlus, Edit2, X, Spark
 import type { BudgetPlan, CategoryInfo } from '../types';
 import * as api from '../api';
 import BudgetWizard from '../components/BudgetWizard';
+import { MONTH_NAMES_SHORT } from '../constants';
+import { formatAmount } from '../utils/formatters';
+import { getApiErrorMessage } from '../utils/errors';
+import { Button, Card, Select } from '../components/ui';
+
+const months = MONTH_NAMES_SHORT;
 
 interface BudgetRow {
   type: string;
@@ -13,7 +19,6 @@ interface BudgetRow {
 }
 
 export default function BudgetPlanningPage() {
-  const [_budgets, setBudgets] = useState<BudgetPlan[]>([]);
   const [categories, setCategories] = useState<CategoryInfo[]>([]);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [loading, setLoading] = useState(true);
@@ -45,11 +50,6 @@ export default function BudgetPlanningPage() {
 
   // Budget Wizard
   const [showWizard, setShowWizard] = useState(false);
-
-  const months = [
-    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
-  ];
 
   useEffect(() => {
     loadInitialData();
@@ -97,9 +97,9 @@ export default function BudgetPlanningPage() {
       setNewCategory({ name: '', type: 'Expenses' });
       await loadAllCategories();
       await loadInitialData(); // Reload categories for dropdowns
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to create category:', error);
-      alert(error.response?.data?.detail || 'Failed to create category');
+      alert(getApiErrorMessage(error) || 'Failed to create category');
     }
   };
 
@@ -119,9 +119,9 @@ export default function BudgetPlanningPage() {
       setEditingCategory(null);
       await loadAllCategories();
       await loadInitialData();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to update category:', error);
-      alert(error.response?.data?.detail || 'Failed to update category');
+      alert(getApiErrorMessage(error) || 'Failed to update category');
     }
   };
 
@@ -135,9 +135,9 @@ export default function BudgetPlanningPage() {
       alert(result.message);
       await loadAllCategories();
       await loadInitialData();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to delete category:', error);
-      alert(error.response?.data?.detail || 'Failed to delete category');
+      alert(getApiErrorMessage(error) || 'Failed to delete category');
     }
   };
 
@@ -148,9 +148,9 @@ export default function BudgetPlanningPage() {
       });
       await loadAllCategories();
       await loadInitialData();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to toggle category status:', error);
-      alert(error.response?.data?.detail || 'Failed to update category');
+      alert(getApiErrorMessage(error) || 'Failed to update category');
     }
   };
 
@@ -158,7 +158,6 @@ export default function BudgetPlanningPage() {
     setLoading(true);
     try {
       const data = await api.getBudgets(selectedYear);
-      setBudgets(data);
       organizeBudgets(data);
     } catch (error) {
       console.error('Failed to load budgets:', error);
@@ -221,9 +220,9 @@ export default function BudgetPlanningPage() {
         amount,
       });
       await loadBudgets();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to save budget:', error);
-      const errorMsg = error?.response?.data?.detail || 'Failed to save budget. Please try again.';
+      const errorMsg = getApiErrorMessage(error) || 'Failed to save budget. Please try again.';
       alert(errorMsg);
     } finally {
       setSaving(false);
@@ -322,13 +321,6 @@ export default function BudgetPlanningPage() {
     setSelectedRows(newSelection);
   };
 
-  const formatAmount = (amount: number) => {
-    return new Intl.NumberFormat('de-CH', {
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
-  };
-
   const getTypeColor = (type: string) => {
     switch (type) {
       case 'Income':
@@ -363,60 +355,56 @@ export default function BudgetPlanningPage() {
         </div>
 
         <div className="flex items-center gap-4">
-          <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">Year</label>
-            <select
-              value={selectedYear}
-              onChange={(e) => setSelectedYear(Number(e.target.value))}
-              className="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            >
-              {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() + i - 1).map((y) => (
-                <option key={y} value={y}>
-                  {y}
-                </option>
-              ))}
-            </select>
-          </div>
+          <Select
+            label="Year"
+            value={selectedYear}
+            onChange={(e) => setSelectedYear(Number(e.target.value))}
+            options={Array.from({ length: 5 }, (_, i) => new Date().getFullYear() + i - 1).map(
+              (y) => ({ value: y, label: String(y) })
+            )}
+            className="text-sm"
+          />
 
           {selectedRows.size > 0 && (
-            <button
+            <Button
+              variant="danger"
               onClick={handleBulkDelete}
-              className="mt-5 px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 flex items-center"
+              className="mt-5 flex items-center"
             >
               <Trash2 className="w-4 h-4 mr-2" />
               Delete Selected ({selectedRows.size})
-            </button>
+            </Button>
           )}
 
-          <button
+          <Button
             onClick={handleOpenCategoryModal}
-            className="mt-5 px-4 py-2 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 flex items-center"
+            className="mt-5 flex items-center bg-purple-600 hover:bg-purple-700"
           >
             <FolderPlus className="w-4 h-4 mr-2" />
             Manage Categories
-          </button>
+          </Button>
 
-          <button
+          <Button
             onClick={() => setShowWizard(true)}
-            className="mt-5 px-4 py-2 bg-gradient-to-r from-green-500 to-teal-500 text-white rounded-lg font-medium hover:from-green-600 hover:to-teal-600 flex items-center relative"
+            className="mt-5 flex items-center bg-gradient-to-r from-green-500 to-teal-500 hover:from-green-600 hover:to-teal-600"
           >
             <Sparkles className="w-4 h-4 mr-2" />
             Budget Wizard
-          </button>
+          </Button>
 
-          <button
+          <Button
             onClick={() => setShowAddForm(true)}
-            className="mt-5 px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 flex items-center"
+            className="mt-5 flex items-center"
           >
             <Plus className="w-4 h-4 mr-2" />
             Add Budget
-          </button>
+          </Button>
         </div>
       </div>
 
       {/* Add Budget Form */}
       {showAddForm && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <Card className="border border-gray-200" shadow="sm">
           <h3 className="text-lg font-semibold mb-4">Add New Budget</h3>
           <div className="grid md:grid-cols-4 gap-4">
             <div>
@@ -506,32 +494,32 @@ export default function BudgetPlanningPage() {
           </div>
 
           <div className="flex gap-2 mt-4">
-            <button
+            <Button
               onClick={handleAddBudget}
-              disabled={saving}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:bg-gray-300 flex items-center"
+              isLoading={saving}
+              className="flex items-center"
             >
-              <Save className="w-4 h-4 mr-2" />
+              {!saving && <Save className="w-4 h-4 mr-2" />}
               {saving ? 'Saving...' : 'Save Budget'}
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="outline"
               onClick={() => setShowAddForm(false)}
-              className="px-4 py-2 border border-gray-300 rounded-lg font-medium hover:bg-gray-50"
             >
               Cancel
-            </button>
+            </Button>
           </div>
-        </div>
+        </Card>
       )}
 
       {/* Budget Tables by Type */}
       {loading ? (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center text-gray-500">
-          Loading budgets...
-        </div>
+        <Card className="border border-gray-200 text-center" shadow="sm" padding="lg">
+          <p className="text-gray-500">Loading budgets...</p>
+        </Card>
       ) : (
         Object.entries(groupedRows).map(([type, rows]) => (
-          <div key={type} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+          <Card key={type} className="border border-gray-200 overflow-hidden" shadow="sm" padding="none">
             <div
               className={`px-6 py-4 border-b border-gray-200 ${
                 type === 'Income'
@@ -659,12 +647,12 @@ export default function BudgetPlanningPage() {
                 </table>
               </div>
             )}
-          </div>
+          </Card>
         ))
       )}
 
       {/* Summary Card */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+      <Card className="border border-gray-200" shadow="sm">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Budget Summary for {selectedYear}</h3>
         <div className="grid md:grid-cols-4 gap-4">
           <div className="p-4 bg-green-50 rounded-lg">
@@ -697,7 +685,7 @@ export default function BudgetPlanningPage() {
             </p>
           </div>
         </div>
-      </div>
+      </Card>
 
       {/* Category Management Modal */}
       {showCategoryModal && (

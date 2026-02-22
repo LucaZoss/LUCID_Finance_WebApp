@@ -10,7 +10,6 @@ export default function RulesPage() {
   const [types, setTypes] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
-  const [_editingRule, setEditingRule] = useState<CategorizationRule | null>(null);
   const [applying, setApplying] = useState(false);
 
   // Form state
@@ -39,7 +38,7 @@ export default function RulesPage() {
       setRules(rulesData);
       setCategories(categoriesData);
       setTypes(typesData);
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Failed to load data:', error);
     } finally {
       setLoading(false);
@@ -57,7 +56,7 @@ export default function RulesPage() {
       setRules([newRule, ...rules]);
       setShowAddForm(false);
       resetForm();
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Failed to create rule:', error);
       alert('Failed to create rule');
     }
@@ -67,8 +66,7 @@ export default function RulesPage() {
     try {
       const updatedRule = await api.updateRule(id, update);
       setRules(rules.map((r) => (r.id === id ? updatedRule : r)));
-      setEditingRule(null);
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Failed to update rule:', error);
       alert('Failed to update rule');
     }
@@ -80,7 +78,7 @@ export default function RulesPage() {
     try {
       await api.deleteRule(id);
       setRules(rules.filter((r) => r.id !== id));
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Failed to delete rule:', error);
       alert('Failed to delete rule');
     }
@@ -104,7 +102,7 @@ export default function RulesPage() {
         `• Total: ${result.total_transactions} transactions\n` +
         `• Active rules: ${result.active_rules}`
       );
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Failed to apply rules:', error);
       alert('Failed to apply rules to transactions');
     } finally {

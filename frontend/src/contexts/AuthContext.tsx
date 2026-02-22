@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import type { ReactNode } from 'react';
 import * as api from '../api';
+import { getApiErrorMessage } from '../utils/errors';
 
 interface User {
   username: string;
@@ -140,9 +141,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       // Initialize inactivity timer
       resetInactivityTimer();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Login failed:', error);
-      throw new Error(error?.response?.data?.detail || 'Login failed');
+      throw new Error(getApiErrorMessage(error) || 'Login failed');
     }
   };
 

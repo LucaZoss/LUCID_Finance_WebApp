@@ -19,7 +19,6 @@ from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
 from sqlalchemy import func
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
@@ -36,6 +35,26 @@ from .auth import (
     get_current_user,
     get_admin_user,
     get_password_hash,
+)
+from .schemas import (
+    TransactionResponse,
+    TransactionUpdate,
+    BulkTransactionUpdate,
+    BudgetPlanResponse,
+    BudgetPlanCreate,
+    CategoryInfo,
+    CategoryResponse,
+    CategoryCreate,
+    CategoryUpdate,
+    SummaryItem,
+    DashboardSummary,
+    LoginRequest,
+    LoginResponse,
+    UserCreate,
+    UserResponse,
+    RuleCreate,
+    RuleUpdate,
+    RuleResponse,
 )
 
 # Initialize app
@@ -58,175 +77,6 @@ app.add_middleware(
 db_config = DatabaseConfig()
 db_manager = DatabaseManager(db_config)
 pipeline_config = PipelineConfig()
-
-
-# Pydantic models for API
-class TransactionResponse(BaseModel):
-    id: int
-    date: date
-    type: str
-    category: str
-    amount: float
-    description: Optional[str]
-    source: str
-    month: int
-    year: int
-    source_file: Optional[str]
-
-    class Config:
-        from_attributes = True
-
-
-class TransactionUpdate(BaseModel):
-    type: Optional[str] = None
-    category: Optional[str] = None
-
-
-class BulkTransactionUpdate(BaseModel):
-    transaction_ids: List[int]
-    type: Optional[str] = None
-    category: Optional[str] = None
-
-
-class BudgetPlanResponse(BaseModel):
-    id: int
-    type: str
-    category: str
-    year: int
-    month: Optional[int]
-    amount: float
-
-    class Config:
-        from_attributes = True
-
-
-class BudgetPlanCreate(BaseModel):
-    type: str
-    category: str
-    year: int
-    month: Optional[int] = None
-    amount: float
-
-
-class CategoryInfo(BaseModel):
-    type: str
-    categories: List[str]
-
-
-class CategoryResponse(BaseModel):
-    id: int
-    name: str
-    type: str
-    is_active: bool
-    display_order: int
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
-
-
-class CategoryCreate(BaseModel):
-    name: str
-    type: str
-    display_order: int = 0
-
-
-class CategoryUpdate(BaseModel):
-    name: Optional[str] = None
-    type: Optional[str] = None
-    is_active: Optional[bool] = None
-    display_order: Optional[int] = None
-
-
-class SummaryItem(BaseModel):
-    type: str
-    category: str
-    budget: float
-    actual: float
-    remaining: float
-    percent_complete: float
-
-
-class DashboardSummary(BaseModel):
-    year: int
-    month: Optional[int]
-    income: List[SummaryItem]
-    expenses: List[SummaryItem]
-    savings: List[SummaryItem]
-    totals: dict
-    fixed_cost_ratio: float
-    previous_period: dict
-    latest_transaction_date: Optional[str]
-
-
-class LoginRequest(BaseModel):
-    username: str
-    password: str
-
-
-class LoginResponse(BaseModel):
-    access_token: str
-    token_type: str
-    username: str
-    is_admin: bool
-
-
-class UserCreate(BaseModel):
-    username: str
-    password: str
-    full_name: Optional[str] = None
-    is_admin: bool = False
-
-
-class UserResponse(BaseModel):
-    id: int
-    username: str
-    full_name: Optional[str]
-    is_active: bool
-    is_admin: bool
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
-
-
-class RuleCreate(BaseModel):
-    pattern: str
-    case_sensitive: bool = False
-    amount_operator: Optional[str] = None  # eq, gte, lte, gt, lt
-    amount_value: Optional[float] = None
-    type: str
-    category: str
-    priority: int = 0
-
-
-class RuleUpdate(BaseModel):
-    pattern: Optional[str] = None
-    case_sensitive: Optional[bool] = None
-    amount_operator: Optional[str] = None
-    amount_value: Optional[float] = None
-    type: Optional[str] = None
-    category: Optional[str] = None
-    priority: Optional[int] = None
-    is_active: Optional[bool] = None
-
-
-class RuleResponse(BaseModel):
-    id: int
-    pattern: str
-    case_sensitive: bool
-    amount_operator: Optional[str]
-    amount_value: Optional[float]
-    type: str
-    category: str
-    priority: int
-    is_active: bool
-    user_id: Optional[int]
-    created_at: datetime
-    updated_at: datetime
-
-    class Config:
-        from_attributes = True
 
 
 # ============== Authentication Endpoints ==============

@@ -125,3 +125,4 @@ site/
 # Claude Code
 # -----------
 .claude/
+.agents/

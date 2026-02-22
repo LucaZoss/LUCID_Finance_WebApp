@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { Upload, Search, Edit2, Check, X, Trash2, RefreshCw } from 'lucide-react';
 import type { Transaction, CategoryInfo } from '../types';
 import * as api from '../api';
+import { formatAmount } from '../utils/formatters';
+import { Button, Card, Select, Input } from '../components/ui';
 
 export default function TransactionsPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -226,13 +228,6 @@ export default function TransactionsPage() {
     });
   };
 
-  const formatAmount = (amount: number) => {
-    return new Intl.NumberFormat('de-CH', {
-      style: 'currency',
-      currency: 'CHF',
-    }).format(amount);
-  };
-
   const getTypeColor = (type: string) => {
     switch (type) {
       case 'Income':
@@ -251,7 +246,7 @@ export default function TransactionsPage() {
   return (
     <div className="space-y-6">
       {/* Upload Section */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+      <Card className="border border-gray-200" shadow="sm">
         <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
           <Upload className="w-5 h-5 mr-2 text-blue-600" />
           Upload CSV Files
@@ -291,115 +286,90 @@ export default function TransactionsPage() {
           </div>
         </div>
 
-        <button
+        <Button
           onClick={handleUpload}
-          disabled={uploading || (!ubsFile && !ccFile)}
-          className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center"
+          disabled={(!ubsFile && !ccFile)}
+          isLoading={uploading}
+          className="mt-4 flex items-center"
         >
-          {uploading ? (
-            <>
-              <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-              Processing...
-            </>
-          ) : (
-            <>
-              <Upload className="w-4 h-4 mr-2" />
-              Upload & Process
-            </>
-          )}
-        </button>
-      </div>
+          {!uploading && <Upload className="w-4 h-4 mr-2" />}
+          {uploading ? 'Processing...' : 'Upload & Process'}
+        </Button>
+      </Card>
 
       {/* Filters */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+      <Card className="border border-gray-200" shadow="sm" padding="sm">
         <div className="flex flex-wrap gap-4 items-center">
-          <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">Year</label>
-            <select
-              value={filterYear || ''}
-              onChange={(e) => setFilterYear(e.target.value ? Number(e.target.value) : undefined)}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            >
-              <option value="">All Years</option>
-              {years.map((y) => (
-                <option key={y} value={y}>
-                  {y}
-                </option>
-              ))}
-            </select>
-          </div>
+          <Select
+            label="Year"
+            value={filterYear || ''}
+            onChange={(e) => setFilterYear(e.target.value ? Number(e.target.value) : undefined)}
+            options={[
+              { value: '', label: 'All Years' },
+              ...years.map((y) => ({ value: y, label: String(y) })),
+            ]}
+            className="text-sm"
+          />
 
-          <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">Month</label>
-            <select
-              value={filterMonth || ''}
-              onChange={(e) => setFilterMonth(e.target.value ? Number(e.target.value) : undefined)}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            >
-              <option value="">All Months</option>
-              {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
-                <option key={m} value={m}>
-                  {new Date(2000, m - 1).toLocaleString('default', { month: 'long' })}
-                </option>
-              ))}
-            </select>
-          </div>
+          <Select
+            label="Month"
+            value={filterMonth || ''}
+            onChange={(e) => setFilterMonth(e.target.value ? Number(e.target.value) : undefined)}
+            options={[
+              { value: '', label: 'All Months' },
+              ...Array.from({ length: 12 }, (_, i) => i + 1).map((m) => ({
+                value: m,
+                label: new Date(2000, m - 1).toLocaleString('default', { month: 'long' }),
+              })),
+            ]}
+            className="text-sm"
+          />
 
-          <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">Type</label>
-            <select
-              value={filterType}
-              onChange={(e) => setFilterType(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            >
-              <option value="">All Types</option>
-              {types.map((t) => (
-                <option key={t} value={t}>
-                  {t}
-                </option>
-              ))}
-            </select>
-          </div>
+          <Select
+            label="Type"
+            value={filterType}
+            onChange={(e) => setFilterType(e.target.value)}
+            options={[
+              { value: '', label: 'All Types' },
+              ...types.map((t) => ({ value: t, label: t })),
+            ]}
+            className="text-sm"
+          />
 
-          <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">Category</label>
-            <select
-              value={filterCategory}
-              onChange={(e) => setFilterCategory(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-w-[150px]"
-            >
-              <option value="">All Categories</option>
-              {categories.flatMap((c) => c.categories).filter((v, i, a) => a.indexOf(v) === i).sort().map((cat) => (
-                <option key={cat} value={cat}>
-                  {cat}
-                </option>
-              ))}
-            </select>
-          </div>
+          <Select
+            label="Category"
+            value={filterCategory}
+            onChange={(e) => setFilterCategory(e.target.value)}
+            options={[
+              { value: '', label: 'All Categories' },
+              ...categories
+                .flatMap((c) => c.categories)
+                .filter((v, i, a) => a.indexOf(v) === i)
+                .sort()
+                .map((cat) => ({ value: cat, label: cat })),
+            ]}
+            className="text-sm min-w-[150px]"
+          />
 
-          <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">Min Amount</label>
-            <input
-              type="number"
-              step="0.01"
-              placeholder="0.00"
-              value={filterAmountMin}
-              onChange={(e) => setFilterAmountMin(e.target.value)}
-              className="w-28 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            />
-          </div>
+          <Input
+            label="Min Amount"
+            type="number"
+            step="0.01"
+            placeholder="0.00"
+            value={filterAmountMin}
+            onChange={(e) => setFilterAmountMin(e.target.value)}
+            className="w-28 text-sm"
+          />
 
-          <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">Max Amount</label>
-            <input
-              type="number"
-              step="0.01"
-              placeholder="9999.99"
-              value={filterAmountMax}
-              onChange={(e) => setFilterAmountMax(e.target.value)}
-              className="w-28 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            />
-          </div>
+          <Input
+            label="Max Amount"
+            type="number"
+            step="0.01"
+            placeholder="9999.99"
+            value={filterAmountMax}
+            onChange={(e) => setFilterAmountMax(e.target.value)}
+            className="w-28 text-sm"
+          />
 
           <div className="flex-1 min-w-[200px]">
             <label className="block text-xs font-medium text-gray-500 mb-1">Search</label>
@@ -416,23 +386,27 @@ export default function TransactionsPage() {
           </div>
 
           <div className="pt-5 flex gap-2">
-            <button
+            <Button
+              variant="outline"
+              size="sm"
               onClick={clearFilters}
-              className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg flex items-center"
+              className="flex items-center"
             >
               <X className="w-4 h-4 mr-1" />
               Clear
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
               onClick={loadTransactions}
-              className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg flex items-center"
+              className="flex items-center"
             >
               <RefreshCw className="w-4 h-4 mr-1" />
               Refresh
-            </button>
+            </Button>
           </div>
         </div>
-      </div>
+      </Card>
 
       {/* Bulk Edit Toolbar */}
       {selectedIds.size > 0 && (

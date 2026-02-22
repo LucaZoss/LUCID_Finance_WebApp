@@ -16,6 +16,11 @@ import {
 import { TrendingUp, TrendingDown, DollarSign, Calendar } from 'lucide-react';
 import type { DashboardSummary, MonthlyTrend } from '../types';
 import * as api from '../api';
+import { MONTH_NAMES, CHART_COLORS } from '../constants';
+import { formatAmount } from '../utils/formatters';
+import { LoadingSpinner, Select, Button, Card } from '../components/ui';
+
+const months = MONTH_NAMES;
 
 export default function DashboardPage() {
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
@@ -26,18 +31,6 @@ export default function DashboardPage() {
   const [years, setYears] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
   const [initialFiltersSet, setInitialFiltersSet] = useState(false);
-
-  const months = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December'
-  ];
-
-  const COLORS = {
-    income: '#22c55e',
-    expenses: '#ef4444',
-    savings: '#3b82f6',
-    remaining: '#f59e0b',
-  };
 
   useEffect(() => {
     loadYears();
@@ -99,15 +92,6 @@ export default function DashboardPage() {
     }
   };
 
-  const formatAmount = (amount: number) => {
-    return new Intl.NumberFormat('de-CH', {
-      style: 'currency',
-      currency: 'CHF',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
-  };
-
   const formatShortAmount = (amount: number) => {
     if (amount >= 1000) {
       return `${(amount / 1000).toFixed(1)}k`;
@@ -117,20 +101,13 @@ export default function DashboardPage() {
 
   const getPeriodText = () => {
     if (selectedMonth) {
-      return `${months[selectedMonth - 1]} ${selectedYear}`;
+      return `${MONTH_NAMES[selectedMonth - 1]} ${selectedYear}`;
     }
     return `${selectedYear} (Full Year)`;
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-500">Loading dashboard...</p>
-        </div>
-      </div>
-    );
+    return <LoadingSpinner centered size="lg" text="Loading dashboard..." />;
   }
 
   if (!summary) {
@@ -153,13 +130,13 @@ export default function DashboardPage() {
     }));
 
   const pieData = [
-    { name: 'Income', value: summary.totals.income.actual, color: COLORS.income },
-    { name: 'Expenses', value: summary.totals.expenses.actual, color: COLORS.expenses },
-    { name: 'Savings', value: summary.totals.savings.actual, color: COLORS.savings },
+    { name: 'Income', value: summary.totals.income.actual, color: CHART_COLORS.income },
+    { name: 'Expenses', value: summary.totals.expenses.actual, color: CHART_COLORS.expenses },
+    { name: 'Savings', value: summary.totals.savings.actual, color: CHART_COLORS.savings },
   ];
 
   const trendChartData = monthlyTrend.map((item) => ({
-    month: months[item.month - 1].substring(0, 3),
+    month: MONTH_NAMES[item.month - 1].substring(0, 3),
     Income: item.Income,
     Expenses: item.Expenses,
     Savings: item.Savings,
@@ -190,36 +167,24 @@ export default function DashboardPage() {
         </div>
 
         <div className="flex items-center gap-4">
-          <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">Year</label>
-            <select
-              value={selectedYear}
-              onChange={(e) => setSelectedYear(Number(e.target.value))}
-              className="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            >
-              {years.map((y) => (
-                <option key={y} value={y}>
-                  {y}
-                </option>
-              ))}
-            </select>
-          </div>
+          <Select
+            label="Year"
+            value={selectedYear}
+            onChange={(e) => setSelectedYear(Number(e.target.value))}
+            options={years.map((y) => ({ value: y, label: String(y) }))}
+            className="text-sm"
+          />
 
-          <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">Period</label>
-            <select
-              value={selectedMonth || ''}
-              onChange={(e) => setSelectedMonth(e.target.value ? Number(e.target.value) : undefined)}
-              className="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            >
-              <option value="">Full Year</option>
-              {months.map((month, i) => (
-                <option key={i} value={i + 1}>
-                  {month}
-                </option>
-              ))}
-            </select>
-          </div>
+          <Select
+            label="Period"
+            value={selectedMonth || ''}
+            onChange={(e) => setSelectedMonth(e.target.value ? Number(e.target.value) : undefined)}
+            options={[
+              { value: '', label: 'Full Year' },
+              ...months.map((month, i) => ({ value: i + 1, label: month })),
+            ]}
+            className="text-sm"
+          />
 
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1">
@@ -248,12 +213,14 @@ export default function DashboardPage() {
                 ))}
             </select>
             {selectedCategories.length > 0 && (
-              <button
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={() => setSelectedCategories([])}
-                className="text-xs text-blue-600 hover:text-blue-800 mt-1"
+                className="text-xs mt-1"
               >
                 Clear all
-              </button>
+              </Button>
             )}
           </div>
         </div>
@@ -372,7 +339,7 @@ export default function DashboardPage() {
               {formatAmount(netActual)}
             </p>
             <p className="text-sm text-gray-500 mt-1">
-              vs {summary.previous_period.month ? months[summary.previous_period.month - 1] : 'Full Year'} {summary.previous_period.year}
+              vs {summary.previous_period.month ? MONTH_NAMES[summary.previous_period.month - 1] : 'Full Year'} {summary.previous_period.year}
             </p>
             <div className="mt-3">
               {(() => {
@@ -395,7 +362,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Monthly Trend Chart - Full Width */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+      <Card className="border border-gray-200" shadow="sm">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">
           Monthly Trend - {selectedYear}
           {selectedCategories.length > 0 && (
@@ -416,23 +383,23 @@ export default function DashboardPage() {
               }}
             />
             <Legend />
-            <Bar dataKey="Income" fill={COLORS.income} name="Income" />
+            <Bar dataKey="Income" fill={CHART_COLORS.income} name="Income" />
             <Bar dataKey="IncomeBudget" fill="#9ca3af" legendType="none" />
-            <Bar dataKey="Expenses" fill={COLORS.expenses} name="Expenses" />
+            <Bar dataKey="Expenses" fill={CHART_COLORS.expenses} name="Expenses" />
             <Bar dataKey="ExpensesBudget" fill="#9ca3af" legendType="none" />
-            <Bar dataKey="Savings" fill={COLORS.savings} name="Savings" />
+            <Bar dataKey="Savings" fill={CHART_COLORS.savings} name="Savings" />
             <Bar dataKey="SavingsBudget" fill="#9ca3af" legendType="none" />
           </ComposedChart>
         </ResponsiveContainer>
         <p className="text-xs text-gray-500 mt-2">
           Colored bars show actual values, grey bars show budgeted values
         </p>
-      </div>
+      </Card>
 
       {/* Bottom Charts Row */}
       <div className="grid lg:grid-cols-2 gap-6">
         {/* Pie Chart - Distribution */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <Card className="border border-gray-200" shadow="sm">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Distribution</h3>
           <ResponsiveContainer width="100%" height={350}>
             <PieChart>
@@ -453,10 +420,10 @@ export default function DashboardPage() {
               <Tooltip formatter={(value: number | undefined) => value !== undefined ? formatAmount(value) : 'N/A'} />
             </PieChart>
           </ResponsiveContainer>
-        </div>
+        </Card>
 
         {/* Top Expenses Chart */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <Card className="border border-gray-200" shadow="sm">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Top 10 Expense Categories</h3>
           <ResponsiveContainer width="100%" height={350}>
             <BarChart data={topExpenses} layout="vertical">
@@ -465,11 +432,11 @@ export default function DashboardPage() {
               <YAxis dataKey="category" type="category" width={150} />
               <Tooltip formatter={(value: number | undefined) => value !== undefined ? formatAmount(value) : 'N/A'} />
               <Legend />
-              <Bar dataKey="actual" fill={COLORS.expenses} name="Actual" />
-              <Bar dataKey="budget" fill={COLORS.remaining} name="Budget" />
+              <Bar dataKey="actual" fill={CHART_COLORS.expenses} name="Actual" />
+              <Bar dataKey="budget" fill={CHART_COLORS.remaining} name="Budget" />
             </BarChart>
           </ResponsiveContainer>
-        </div>
+        </Card>
       </div>
 
       {/* Detailed Breakdown Tables */}
