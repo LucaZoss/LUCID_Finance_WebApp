@@ -10,9 +10,11 @@ Provides REST API endpoints for:
 from datetime import datetime
 
 from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.orm import Session
 
+from .dependencies import get_db, get_current_user
 from .routers import (
     auth_router,
     transactions_router,
@@ -61,6 +63,19 @@ app.include_router(export_router)
 def health_check():
     """Health check endpoint."""
     return {"status": "healthy", "timestamp": datetime.now().isoformat()}
+
+
+@app.get("/api/years")
+def get_available_years(
+    current_user: dict = Depends(get_current_user),
+    session: Session = Depends(get_db)
+):
+    """Get list of years with transaction data."""
+    from .data_pipeline.models import Transaction
+    years = session.query(Transaction.year).filter(
+        Transaction.user_id == current_user["id"]
+    ).distinct().order_by(Transaction.year.desc()).all()
+    return [y[0] for y in years]
 
 
 if __name__ == "__main__":

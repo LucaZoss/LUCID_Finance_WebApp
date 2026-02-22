@@ -279,15 +279,3 @@ def get_monthly_trend(
             months[r.month]["SavingsBudget"] = float(r.total)
 
     return list(months.values())
-
-
-@router.get("/years")
-def get_available_years(
-    current_user: dict = Depends(get_current_user),
-    session: Session = Depends(get_db)
-):
-    """Get list of years with transaction data."""
-    years = session.query(Transaction.year).filter(
-        Transaction.user_id == current_user["id"]
-    ).distinct().order_by(Transaction.year.desc()).all()
-    return [y[0] for y in years]
