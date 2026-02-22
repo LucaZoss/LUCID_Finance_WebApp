@@ -126,3 +126,14 @@ site/
 # -----------
 .claude/
 .agents/
+
+# Documentation - Historical/Reference
+# -------------------------------------
+# These files are kept locally for reference but not tracked in git
+# Their content has been incorporated into the new comprehensive docs
+docs/SD_CARD_OPTIMIZATION.md
+docs/USER_ISOLATION_FIX.md
+docs/DASHBOARD_FIXES.md
+docs/AUTHENTICATION.md
+docs/PROJECT_STRUCTURE.md
+docs/PRODUCTION_ENV.md
