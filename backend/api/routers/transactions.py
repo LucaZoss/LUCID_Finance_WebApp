@@ -105,20 +105,26 @@ def update_transaction(
     return TransactionResponse.model_validate(transaction)
 
 
-@router.post("/bulk-debug")
-async def bulk_update_debug(request: Request):
-    """Debug endpoint to see raw request body."""
+@router.patch("/bulk-debug")
+async def bulk_update_debug(
+    request: Request,
+    current_user: dict = Depends(get_current_user)
+):
+    """Debug endpoint to test PATCH method with auth."""
     body = await request.body()
     import json
     try:
         parsed = json.loads(body)
         print(f"DEBUG RAW BODY: {parsed}")
-        return {"received": parsed, "body_bytes": str(body)}
+        print(f"DEBUG CURRENT USER: {current_user}")
+        # Try parsing as BulkTransactionUpdate
+        bulk_update = BulkTransactionUpdate(**parsed)
+        return {"success": True, "received": parsed, "parsed": str(bulk_update)}
     except Exception as e:
         return {"error": str(e), "body_bytes": str(body)}
 
 
-@router.patch("/bulk")
+@router.post("/bulk")
 def bulk_update_transactions(
     bulk_update: BulkTransactionUpdate,
     current_user: dict = Depends(get_current_user),
