@@ -10,9 +10,10 @@ from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 
 from ..data_pipeline.models import DatabaseManager, User
-from ..data_pipeline.database_config import db_config
+from ..data_pipeline.config import DatabaseConfig
 
 # Initialize database manager (singleton)
+db_config = DatabaseConfig()
 db_manager = DatabaseManager(db_config)
 
 # OAuth2 scheme for token authentication
