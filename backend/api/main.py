@@ -65,6 +65,14 @@ def health_check():
     return {"status": "healthy", "timestamp": datetime.now().isoformat()}
 
 
+@app.get("/api/types")
+def get_types():
+    """Get all valid transaction types."""
+    from ..data_pipeline.config import PipelineConfig
+    pipeline_config = PipelineConfig()
+    return pipeline_config.categories.valid_types
+
+
 @app.get("/api/years")
 def get_available_years(
     current_user: dict = Depends(get_current_user),
