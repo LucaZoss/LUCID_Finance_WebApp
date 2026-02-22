@@ -42,6 +42,7 @@ class Transaction(Base):
     date = Column(Date, nullable=False, index=True)
     type = Column(String(50), nullable=False, index=True)  # Income, Expenses, Savings, CC_Refund, No-Label
     category = Column(String(100), nullable=False, index=True)
+    sub_type = Column(String(50), nullable=True)  # Essentials, Needs, Wants
     amount = Column(Numeric(12, 2), nullable=False)  # Always positive (absolute value)
 
     # Additional metadata
@@ -126,6 +127,7 @@ class BudgetPlan(Base):
     month = Column(Integer, nullable=True)  # 1-12, NULL for yearly budgets
     type = Column(String(50), nullable=False)  # Income, Expenses, Savings
     category = Column(String(100), nullable=False)
+    sub_type = Column(String(50), nullable=True)  # Essentials, Needs, Wants
     amount = Column(Numeric(12, 2), nullable=False, default=0)  # Renamed from planned_amount for consistency
 
     created_at = Column(DateTime, default=datetime.utcnow)

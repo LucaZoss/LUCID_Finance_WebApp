@@ -14,6 +14,7 @@ class TransactionResponse(BaseModel):
     date: date
     type: str
     category: str
+    sub_type: Optional[str] = None
     amount: float
     description: Optional[str]
     source: str
@@ -28,6 +29,7 @@ class TransactionResponse(BaseModel):
 class TransactionUpdate(BaseModel):
     type: Optional[str] = None
     category: Optional[str] = None
+    sub_type: Optional[str] = None
 
 
 class BulkTransactionUpdate(BaseModel):
@@ -41,6 +43,7 @@ class BudgetPlanResponse(BaseModel):
     id: int
     type: str
     category: str
+    sub_type: Optional[str] = None
     year: int
     month: Optional[int]
     amount: float
@@ -52,6 +55,7 @@ class BudgetPlanResponse(BaseModel):
 class BudgetPlanCreate(BaseModel):
     type: str
     category: str
+    sub_type: Optional[str] = None
     year: int
     month: Optional[int] = None
     amount: float
