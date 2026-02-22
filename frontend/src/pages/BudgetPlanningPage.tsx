@@ -456,76 +456,81 @@ export default function BudgetPlanningPage() {
       </div>
 
       {/* Budget Summary */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
-        {/* Income */}
-        <Card className="bg-green-50 border border-green-200" shadow="sm">
-          <div className="text-sm font-medium text-green-700 mb-1">Income Budget</div>
-          <div className="text-2xl font-bold text-green-900">{formatAmount(totalIncome)}</div>
-        </Card>
-
-        {/* Essentials */}
-        <Card className="bg-blue-50 border border-blue-200" shadow="sm">
-          <div className="text-sm font-medium text-blue-700 mb-1">Total Essentials</div>
-          <div className="text-2xl font-bold text-blue-900">{formatAmount(totalEssentials)}</div>
-          {totalIncome > 0 && (
-            <div className="text-xs text-blue-600 mt-1">
-              {((totalEssentials / totalIncome) * 100).toFixed(1)}% of income
-            </div>
-          )}
-        </Card>
-
-        {/* Needs */}
-        <Card className="bg-blue-50 border border-blue-200" shadow="sm">
-          <div className="text-sm font-medium text-blue-700 mb-1">Total Needs</div>
-          <div className="text-2xl font-bold text-blue-900">{formatAmount(totalNeeds)}</div>
-          {totalIncome > 0 && (
-            <div className="text-xs text-blue-600 mt-1">
-              {((totalNeeds / totalIncome) * 100).toFixed(1)}% of income
-            </div>
-          )}
-        </Card>
-
-        {/* Wants */}
-        <Card className="bg-purple-50 border border-purple-200" shadow="sm">
-          <div className="text-sm font-medium text-purple-700 mb-1">Total Wants</div>
-          <div className="text-2xl font-bold text-purple-900">{formatAmount(totalWants)}</div>
-          {totalIncome > 0 && (
-            <div className="text-xs text-purple-600 mt-1">
-              {((totalWants / totalIncome) * 100).toFixed(1)}% of income
-            </div>
-          )}
-        </Card>
-
-        {/* Total Expenses */}
-        <Card className="bg-red-50 border border-red-200" shadow="sm">
-          <div className="text-sm font-medium text-red-700 mb-1">Total Expenses</div>
-          <div className="text-2xl font-bold text-red-900">{formatAmount(totalExpenses)}</div>
-          {totalIncome > 0 && (
-            <div className="text-xs text-red-600 mt-1">
-              {((totalExpenses / totalIncome) * 100).toFixed(1)}% of income
-            </div>
-          )}
-        </Card>
-
-        {/* Savings */}
-        <Card className="bg-yellow-50 border border-yellow-200" shadow="sm">
-          <div className="text-sm font-medium text-yellow-700 mb-1">Saving Budget</div>
-          <div className="text-2xl font-bold text-yellow-900">{formatAmount(totalSavings)}</div>
-        </Card>
-
-        {/* Net */}
-        <Card className={`border ${netAmount >= 0 ? 'bg-emerald-50 border-emerald-200' : 'bg-orange-50 border-orange-200'}`} shadow="sm">
-          <div className={`text-sm font-medium mb-1 ${netAmount >= 0 ? 'text-emerald-700' : 'text-orange-700'}`}>
-            Net Amount
+      <Card className="border-2 border-gray-300 bg-gradient-to-r from-gray-50 to-blue-50" shadow="md">
+        <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center">
+          <DollarSign className="w-5 h-5 mr-2 text-blue-600" />
+          Budget Summary - {selectedYear}
+        </h2>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          {/* Income */}
+          <div className="bg-green-50 border-2 border-green-300 rounded-lg p-4">
+            <div className="text-sm font-semibold text-green-700 mb-1">Income Budget</div>
+            <div className="text-2xl font-bold text-green-900">{formatAmount(totalIncome)}</div>
+            <div className="text-xs text-green-600 mt-1">100%</div>
           </div>
-          <div className={`text-2xl font-bold ${netAmount >= 0 ? 'text-emerald-900' : 'text-orange-900'}`}>
-            {formatAmount(netAmount)}
+
+          {/* Total Expenses */}
+          <div className="bg-red-50 border-2 border-red-300 rounded-lg p-4">
+            <div className="text-sm font-semibold text-red-700 mb-1">Total Expenses</div>
+            <div className="text-2xl font-bold text-red-900">{formatAmount(totalExpenses)}</div>
+            {totalIncome > 0 && (
+              <div className="text-xs text-red-600 mt-1">
+                {((totalExpenses / totalIncome) * 100).toFixed(1)}% of income
+              </div>
+            )}
           </div>
-          <div className={`text-xs mt-1 ${netAmount >= 0 ? 'text-emerald-600' : 'text-orange-600'}`}>
-            {netAmount >= 0 ? 'Surplus' : 'Deficit'}
+
+          {/* Essentials & Needs (Grouped) */}
+          <div className="bg-blue-50 border-2 border-blue-300 rounded-lg p-4">
+            <div className="text-sm font-semibold text-blue-700 mb-1">Essentials & Needs</div>
+            <div className="text-2xl font-bold text-blue-900">
+              {formatAmount(totalEssentials + totalNeeds)}
+            </div>
+            {totalIncome > 0 && (
+              <div className="text-xs text-blue-600 mt-1">
+                {(((totalEssentials + totalNeeds) / totalIncome) * 100).toFixed(1)}% of income
+              </div>
+            )}
           </div>
-        </Card>
-      </div>
+
+          {/* Wants */}
+          <div className="bg-purple-50 border-2 border-purple-300 rounded-lg p-4">
+            <div className="text-sm font-semibold text-purple-700 mb-1">Wants</div>
+            <div className="text-2xl font-bold text-purple-900">{formatAmount(totalWants)}</div>
+            {totalIncome > 0 && (
+              <div className="text-xs text-purple-600 mt-1">
+                {((totalWants / totalIncome) * 100).toFixed(1)}% of income
+              </div>
+            )}
+          </div>
+
+          {/* Savings */}
+          <div className="bg-yellow-50 border-2 border-yellow-300 rounded-lg p-4">
+            <div className="text-sm font-semibold text-yellow-700 mb-1">Savings</div>
+            <div className="text-2xl font-bold text-yellow-900">{formatAmount(totalSavings)}</div>
+            {totalIncome > 0 && (
+              <div className="text-xs text-yellow-600 mt-1">
+                {((totalSavings / totalIncome) * 100).toFixed(1)}% of income
+              </div>
+            )}
+          </div>
+
+          {/* Surplus/Deficit */}
+          <div className={`border-2 rounded-lg p-4 ${netAmount >= 0 ? 'bg-emerald-50 border-emerald-300' : 'bg-orange-50 border-orange-300'}`}>
+            <div className={`text-sm font-semibold mb-1 ${netAmount >= 0 ? 'text-emerald-700' : 'text-orange-700'}`}>
+              {netAmount >= 0 ? 'Surplus' : 'Deficit'}
+            </div>
+            <div className={`text-2xl font-bold ${netAmount >= 0 ? 'text-emerald-900' : 'text-orange-900'}`}>
+              {formatAmount(Math.abs(netAmount))}
+            </div>
+            {totalIncome > 0 && (
+              <div className={`text-xs mt-1 ${netAmount >= 0 ? 'text-emerald-600' : 'text-orange-600'}`}>
+                {((Math.abs(netAmount) / totalIncome) * 100).toFixed(1)}% of income
+              </div>
+            )}
+          </div>
+        </div>
+      </Card>
 
       {/* Add Budget Form */}
       {showAddForm && (
