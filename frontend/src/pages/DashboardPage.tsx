@@ -361,7 +361,7 @@ export default function DashboardPage() {
           <div>
             <p className="text-2xl font-bold text-gray-900">{summary.fixed_cost_ratio.toFixed(1)}%</p>
             <p className="text-sm text-gray-500 mt-1">
-              Housing + Health + Tax
+              Essentials Sub-Types vs Income
             </p>
             <div className="mt-3">
               {(() => {
