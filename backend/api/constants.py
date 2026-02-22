@@ -3,8 +3,9 @@ Application constants.
 Extracted from main.py for better organization.
 """
 
-# Fixed cost categories for budget analysis
-FIXED_COST_CATEGORIES = ["Housing", "Health Insurance", "Needs"]
+# Fixed cost calculation now uses sub_type='Essentials' instead of category names
+# This constant is kept for backward compatibility but is no longer actively used
+FIXED_COST_CATEGORIES = ["Housing", "Health Insurance"]  # Legacy - use sub_type='Essentials' instead
 
 # Pagination defaults
 DEFAULT_PAGE_SIZE = 500

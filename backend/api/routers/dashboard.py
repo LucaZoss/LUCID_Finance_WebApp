@@ -138,12 +138,18 @@ def get_dashboard_summary(
     total_savings_actual = sum(i.actual for i in savings_summary)
     total_savings_budget = sum(i.budget for i in savings_summary)
 
-    # Calculate Fixed Cost Ratio = (Housing + Health Insurance + Needs) / Total Income
-    fixed_cost_categories = ["Housing", "Health Insurance", "Needs"]
-    total_fixed_costs = sum(
-        item.actual for item in expense_summary
-        if item.category in fixed_cost_categories
+    # Calculate Fixed Cost Ratio = Essentials / Total Income
+    # Query transactions with sub_type='Essentials' to get actual fixed costs
+    essentials_query = session.query(func.sum(Transaction.amount)).filter(
+        Transaction.user_id == current_user["id"],
+        Transaction.type == "Expenses",
+        Transaction.sub_type == "Essentials",
+        Transaction.year == year
     )
+    if month:
+        essentials_query = essentials_query.filter(Transaction.month == month)
+
+    total_fixed_costs = float(essentials_query.scalar() or 0.0)
     fixed_cost_ratio = (total_fixed_costs / total_income_actual * 100) if total_income_actual > 0 else 0.0
 
     # Get previous period data for year-over-year comparison
