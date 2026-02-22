@@ -3,7 +3,7 @@ Transaction CRUD endpoints for managing financial transactions.
 """
 
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query, File, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, Query, File, UploadFile, Request
 from sqlalchemy.orm import Session
 from pathlib import Path
 import shutil
@@ -103,6 +103,19 @@ def update_transaction(
     session.commit()
     session.refresh(transaction)
     return TransactionResponse.model_validate(transaction)
+
+
+@router.post("/bulk-debug")
+async def bulk_update_debug(request: Request):
+    """Debug endpoint to see raw request body."""
+    body = await request.body()
+    import json
+    try:
+        parsed = json.loads(body)
+        print(f"DEBUG RAW BODY: {parsed}")
+        return {"received": parsed, "body_bytes": str(body)}
+    except Exception as e:
+        return {"error": str(e), "body_bytes": str(body)}
 
 
 @router.patch("/bulk")
