@@ -95,7 +95,7 @@ export const updateTransaction = async (
 
 export const bulkUpdateTransactions = async (
   transactionIds: number[],
-  update: { type?: string; category?: string }
+  update: { type?: string; category?: string; sub_type?: string | null }
 ): Promise<{ updated_count: number; message: string }> => {
   const { data } = await api.patch('/transactions/bulk', {
     transaction_ids: transactionIds,
