@@ -334,9 +334,7 @@ export default function BudgetPlanningPage() {
     if (type === 'Income') {
       return 'border-l-green-500 bg-green-50';
     } else if (type === 'Expenses') {
-      if (sub_type === 'Essentials') {
-        return 'border-l-green-500 bg-green-50';
-      } else if (sub_type === 'Needs') {
+      if (sub_type === 'Essentials' || sub_type === 'Needs') {
         return 'border-l-blue-500 bg-blue-50';
       } else if (sub_type === 'Wants') {
         return 'border-l-purple-500 bg-purple-50';
@@ -344,7 +342,7 @@ export default function BudgetPlanningPage() {
         return 'border-l-red-500 bg-red-50';
       }
     } else if (type === 'Savings') {
-      return 'border-l-blue-500 bg-blue-50';
+      return 'border-l-yellow-500 bg-yellow-50';
     }
     return 'border-l-gray-500 bg-gray-50';
   };
@@ -352,26 +350,35 @@ export default function BudgetPlanningPage() {
   const getGroupHeaderColor = (groupName: string) => {
     if (groupName === 'Income') {
       return 'bg-green-50';
-    } else if (groupName === 'Expenses - Essentials') {
-      return 'bg-green-50';
-    } else if (groupName === 'Expenses - Needs') {
+    } else if (groupName === 'Expenses - Essentials & Needs') {
       return 'bg-blue-50';
     } else if (groupName === 'Expenses - Wants') {
       return 'bg-purple-50';
     } else if (groupName === 'Expenses - Other') {
       return 'bg-red-50';
     } else if (groupName === 'Savings') {
-      return 'bg-blue-50';
+      return 'bg-yellow-50';
     }
     return 'bg-gray-50';
   };
 
   const expenseRows = budgetRows.filter((r) => r.type === 'Expenses');
 
+  // Combine Essentials and Needs, ensure Housing and Health Insurance are first
+  const essentialsAndNeeds = expenseRows.filter(
+    (r) => r.sub_type === 'Essentials' || r.sub_type === 'Needs'
+  ).sort((a, b) => {
+    // Housing first, Health Insurance second, then alphabetical
+    if (a.category === 'Housing') return -1;
+    if (b.category === 'Housing') return 1;
+    if (a.category === 'Health Insurance') return -1;
+    if (b.category === 'Health Insurance') return 1;
+    return a.category.localeCompare(b.category);
+  });
+
   const groupedRows = {
     Income: budgetRows.filter((r) => r.type === 'Income'),
-    'Expenses - Essentials': expenseRows.filter((r) => r.sub_type === 'Essentials'),
-    'Expenses - Needs': expenseRows.filter((r) => r.sub_type === 'Needs'),
+    'Expenses - Essentials & Needs': essentialsAndNeeds,
     'Expenses - Wants': expenseRows.filter((r) => r.sub_type === 'Wants'),
     'Expenses - Other': expenseRows.filter((r) => !r.sub_type || (r.sub_type !== 'Essentials' && r.sub_type !== 'Needs' && r.sub_type !== 'Wants')),
     Savings: budgetRows.filter((r) => r.type === 'Savings'),
@@ -711,9 +718,9 @@ export default function BudgetPlanningPage() {
               )}
             </p>
           </div>
-          <div className="p-4 bg-blue-50 rounded-lg">
-            <p className="text-sm text-blue-600 font-medium">Total Savings Budget</p>
-            <p className="text-2xl font-bold text-blue-700">
+          <div className="p-4 bg-yellow-50 rounded-lg">
+            <p className="text-sm text-yellow-600 font-medium">Total Savings Budget</p>
+            <p className="text-2xl font-bold text-yellow-700">
               CHF {formatAmount(groupedRows.Savings.reduce((sum, r) => sum + (r.yearlyAmount || 0), 0))}
             </p>
           </div>

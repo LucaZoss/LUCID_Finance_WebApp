@@ -183,13 +183,14 @@ export default function TransactionsPage() {
 
   const saveBulkEdit = async () => {
     try {
-      await api.bulkUpdateTransactions(Array.from(selectedIds), bulkEditValues);
-      // Update local state
-      setTransactions(
-        transactions.map((t) =>
-          selectedIds.has(t.id) ? { ...t, ...bulkEditValues } : t
-        )
-      );
+      // Convert empty string sub_type to null
+      const updateValues = {
+        ...bulkEditValues,
+        sub_type: bulkEditValues.sub_type || null,
+      };
+      await api.bulkUpdateTransactions(Array.from(selectedIds), updateValues);
+      // Reload transactions to get updated data
+      await loadTransactions();
       setIsBulkEditMode(false);
       setSelectedIds(new Set());
       alert(`Successfully updated ${selectedIds.size} transactions`);
@@ -228,9 +229,6 @@ export default function TransactionsPage() {
 
     return matchesSearch && matchesSubType;
   });
-
-  // Check if any transactions have sub_type
-  const hasSubTypes = transactions.some((t) => t.sub_type != null);
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
@@ -364,20 +362,18 @@ export default function TransactionsPage() {
             className="text-sm min-w-[150px]"
           />
 
-          {hasSubTypes && (
-            <Select
-              label="Sub-Type"
-              value={filterSubType}
-              onChange={(e) => setFilterSubType(e.target.value)}
-              options={[
-                { value: '', label: 'All Sub-Types' },
-                { value: 'Essentials', label: 'Essentials' },
-                { value: 'Needs', label: 'Needs' },
-                { value: 'Wants', label: 'Wants' },
-              ]}
-              className="text-sm min-w-[140px]"
-            />
-          )}
+          <Select
+            label="Sub-Type"
+            value={filterSubType}
+            onChange={(e) => setFilterSubType(e.target.value)}
+            options={[
+              { value: '', label: 'All Sub-Types' },
+              { value: 'Essentials', label: 'Essentials' },
+              { value: 'Needs', label: 'Needs' },
+              { value: 'Wants', label: 'Wants' },
+            ]}
+            className="text-sm min-w-[140px]"
+          />
 
           <Input
             label="Min Amount"

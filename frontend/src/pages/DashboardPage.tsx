@@ -160,10 +160,6 @@ export default function DashboardPage() {
     totals: filteredTotals,
   } : summary;
 
-  // Check if any items have sub_type
-  const hasSubTypes = [...summary.income, ...summary.expenses, ...summary.savings].some(
-    (item) => (item as any).sub_type != null
-  );
 
   // Prepare data for charts
   const topExpenses = displaySummary.expenses
@@ -233,20 +229,18 @@ export default function DashboardPage() {
             className="text-sm"
           />
 
-          {hasSubTypes && (
-            <Select
-              label="Sub-Type"
-              value={selectedSubType}
-              onChange={(e) => setSelectedSubType(e.target.value)}
-              options={[
-                { value: '', label: 'All' },
-                { value: 'Essentials', label: 'Essentials' },
-                { value: 'Needs', label: 'Needs' },
-                { value: 'Wants', label: 'Wants' },
-              ]}
-              className="text-sm"
-            />
-          )}
+          <Select
+            label="Sub-Type"
+            value={selectedSubType}
+            onChange={(e) => setSelectedSubType(e.target.value)}
+            options={[
+              { value: '', label: 'All' },
+              { value: 'Essentials', label: 'Essentials' },
+              { value: 'Needs', label: 'Needs' },
+              { value: 'Wants', label: 'Wants' },
+            ]}
+            className="text-sm"
+          />
 
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1">
