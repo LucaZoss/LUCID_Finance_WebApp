@@ -47,11 +47,13 @@ def create_budget(
 
     if existing:
         existing.amount = Decimal(str(budget.amount))
+        existing.sub_type = budget.sub_type
     else:
         existing = BudgetPlan(
             user_id=current_user["id"],
             type=budget.type,
             category=budget.category,
+            sub_type=budget.sub_type,
             year=budget.year,
             month=budget.month,
             amount=Decimal(str(budget.amount)),
@@ -77,11 +79,13 @@ def create_budget(
 
                 if monthly_budget:
                     monthly_budget.amount = monthly_amount
+                    monthly_budget.sub_type = budget.sub_type
                 else:
                     monthly_budget = BudgetPlan(
                         user_id=current_user["id"],
                         type=budget.type,
                         category=budget.category,
+                        sub_type=budget.sub_type,
                         year=budget.year,
                         month=month_num,
                         amount=monthly_amount,
@@ -110,11 +114,13 @@ def create_budget(
 
                 if yearly_budget:
                     yearly_budget.amount = yearly_total
+                    yearly_budget.sub_type = budget.sub_type
                 else:
                     yearly_budget = BudgetPlan(
                         user_id=current_user["id"],
                         type=budget.type,
                         category=budget.category,
+                        sub_type=budget.sub_type,
                         year=budget.year,
                         month=None,
                         amount=yearly_total,

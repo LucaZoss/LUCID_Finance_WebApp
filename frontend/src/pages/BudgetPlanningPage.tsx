@@ -13,6 +13,7 @@ const months = MONTH_NAMES_SHORT;
 interface BudgetRow {
   type: string;
   category: string;
+  sub_type: string | null;
   yearlyAmount: number;
   monthlyAmounts: Record<number, number>;
   budgetIds: number[]; // Store all budget IDs for this row (yearly + monthly)
@@ -35,6 +36,7 @@ export default function BudgetPlanningPage() {
   const [newBudget, setNewBudget] = useState({
     type: 'Expenses',
     category: '',
+    sub_type: null as string | null,
     amount: 0,
     isMonthly: false,
   });
@@ -175,6 +177,7 @@ export default function BudgetPlanningPage() {
         rowMap.set(key, {
           type: budget.type,
           category: budget.category,
+          sub_type: budget.sub_type || null,
           yearlyAmount: 0,
           monthlyAmounts: {},
           budgetIds: [],
@@ -183,6 +186,10 @@ export default function BudgetPlanningPage() {
 
       const row = rowMap.get(key)!;
       row.budgetIds.push(budget.id);
+      // Update sub_type if this is the yearly budget
+      if (budget.month === null && budget.sub_type) {
+        row.sub_type = budget.sub_type;
+      }
       if (budget.month === null) {
         row.yearlyAmount = budget.amount;
       } else {
@@ -202,7 +209,8 @@ export default function BudgetPlanningPage() {
     type: string,
     category: string,
     amount: number,
-    month?: number
+    month?: number,
+    sub_type?: string | null
   ) => {
     // Validate amount
     if (isNaN(amount) || amount < 0) {
@@ -215,6 +223,7 @@ export default function BudgetPlanningPage() {
       await api.createBudget({
         type,
         category,
+        sub_type: sub_type || null,
         year: selectedYear,
         month: month || null,
         amount,
@@ -243,6 +252,7 @@ export default function BudgetPlanningPage() {
           await api.createBudget({
             type: newBudget.type,
             category: newBudget.category,
+            sub_type: newBudget.sub_type,
             year: selectedYear,
             month,
             amount: newBudget.amount,
@@ -253,6 +263,7 @@ export default function BudgetPlanningPage() {
         await api.createBudget({
           type: newBudget.type,
           category: newBudget.category,
+          sub_type: newBudget.sub_type,
           year: selectedYear,
           month: null,
           amount: newBudget.amount,
@@ -260,7 +271,7 @@ export default function BudgetPlanningPage() {
       }
 
       setShowAddForm(false);
-      setNewBudget({ type: 'Expenses', category: '', amount: 0, isMonthly: false });
+      setNewBudget({ type: 'Expenses', category: '', sub_type: null, amount: 0, isMonthly: false });
       await loadBudgets();
     } catch (error) {
       console.error('Failed to add budget:', error);
@@ -406,7 +417,7 @@ export default function BudgetPlanningPage() {
       {showAddForm && (
         <Card className="border border-gray-200" shadow="sm">
           <h3 className="text-lg font-semibold mb-4">Add New Budget</h3>
-          <div className="grid md:grid-cols-4 gap-4">
+          <div className="grid md:grid-cols-5 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
               <select
@@ -443,6 +454,20 @@ export default function BudgetPlanningPage() {
             </div>
 
             <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Sub-Type</label>
+              <select
+                value={newBudget.sub_type || ''}
+                onChange={(e) => setNewBudget({ ...newBudget, sub_type: e.target.value || null })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              >
+                <option value="">None</option>
+                <option value="Essentials">Essentials</option>
+                <option value="Needs">Needs</option>
+                <option value="Wants">Wants</option>
+              </select>
+            </div>
+
+            <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Amount (CHF) - {newBudget.isMonthly ? 'Monthly' : 'Yearly Total'}
               </label>
@@ -459,37 +484,37 @@ export default function BudgetPlanningPage() {
                 </p>
               )}
             </div>
+          </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Budget Type</label>
-              <div className="flex flex-col gap-2 pt-2">
-                <label className="flex items-start cursor-pointer">
-                  <input
-                    type="radio"
-                    checked={!newBudget.isMonthly}
-                    onChange={() => setNewBudget({ ...newBudget, isMonthly: false })}
-                    className="mr-2 mt-1"
-                  />
-                  <div>
-                    <span className="font-medium text-gray-900">Yearly Total</span>
-                    <p className="text-xs text-gray-500">Enter total yearly amount (e.g., 12,000 for Travel)</p>
-                    <p className="text-xs text-gray-500">→ Automatically divided into 12 equal monthly budgets</p>
-                  </div>
-                </label>
-                <label className="flex items-start cursor-pointer">
-                  <input
-                    type="radio"
-                    checked={newBudget.isMonthly}
-                    onChange={() => setNewBudget({ ...newBudget, isMonthly: true })}
-                    className="mr-2 mt-1"
-                  />
-                  <div>
-                    <span className="font-medium text-gray-900">Monthly Recurring</span>
-                    <p className="text-xs text-gray-500">Enter monthly amount (e.g., 1,500 for Groceries)</p>
-                    <p className="text-xs text-gray-500">→ Same amount set for all 12 months</p>
-                  </div>
-                </label>
-              </div>
+          <div className="mt-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">Budget Type</label>
+            <div className="grid md:grid-cols-2 gap-4">
+              <label className="flex items-start cursor-pointer p-3 border border-gray-300 rounded-lg hover:bg-gray-50">
+                <input
+                  type="radio"
+                  checked={!newBudget.isMonthly}
+                  onChange={() => setNewBudget({ ...newBudget, isMonthly: false })}
+                  className="mr-3 mt-1"
+                />
+                <div>
+                  <span className="font-medium text-gray-900">Yearly Total</span>
+                  <p className="text-xs text-gray-500">Enter total yearly amount (e.g., 12,000 for Travel)</p>
+                  <p className="text-xs text-gray-500">→ Automatically divided into 12 equal monthly budgets</p>
+                </div>
+              </label>
+              <label className="flex items-start cursor-pointer p-3 border border-gray-300 rounded-lg hover:bg-gray-50">
+                <input
+                  type="radio"
+                  checked={newBudget.isMonthly}
+                  onChange={() => setNewBudget({ ...newBudget, isMonthly: true })}
+                  className="mr-3 mt-1"
+                />
+                <div>
+                  <span className="font-medium text-gray-900">Monthly Recurring</span>
+                  <p className="text-xs text-gray-500">Enter monthly amount (e.g., 1,500 for Groceries)</p>
+                  <p className="text-xs text-gray-500">→ Same amount set for all 12 months</p>
+                </div>
+              </label>
             </div>
           </div>
 
@@ -555,6 +580,9 @@ export default function BudgetPlanningPage() {
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase sticky left-0 bg-gray-50">
                         Category
                       </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Sub-Type
+                      </th>
                       <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
                         Yearly
                       </th>
@@ -582,6 +610,21 @@ export default function BudgetPlanningPage() {
                         <td className="px-4 py-3 text-sm font-medium text-gray-900 sticky left-0 bg-white">
                           {row.category}
                         </td>
+                        <td className="px-4 py-3 text-sm text-gray-900">
+                          <select
+                            value={row.sub_type || ''}
+                            onChange={(e) => {
+                              const newSubType = e.target.value || null;
+                              handleSaveBudget(row.type, row.category, row.yearlyAmount, undefined, newSubType);
+                            }}
+                            className="w-full px-2 py-1 text-sm border border-gray-200 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          >
+                            <option value="">None</option>
+                            <option value="Essentials">Essentials</option>
+                            <option value="Needs">Needs</option>
+                            <option value="Wants">Wants</option>
+                          </select>
+                        </td>
                         <td className="px-4 py-3 text-sm text-gray-900 text-right">
                           <input
                             type="number"
@@ -594,7 +637,7 @@ export default function BudgetPlanningPage() {
                               const value = inputValue === '' ? 0 : Number(inputValue);
                               // Only save if value changed and is valid
                               if (!isNaN(value) && value !== row.yearlyAmount) {
-                                handleSaveBudget(row.type, row.category, value);
+                                handleSaveBudget(row.type, row.category, value, undefined, row.sub_type);
                               }
                             }}
                             className="w-24 px-2 py-1 text-right border border-gray-200 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -615,7 +658,7 @@ export default function BudgetPlanningPage() {
                                 const currentValue = row.monthlyAmounts[monthIndex + 1] || 0;
                                 // Only save if value changed and is valid
                                 if (!isNaN(value) && value !== currentValue) {
-                                  handleSaveBudget(row.type, row.category, value, monthIndex + 1);
+                                  handleSaveBudget(row.type, row.category, value, monthIndex + 1, row.sub_type);
                                 }
                               }}
                               className="w-20 px-2 py-1 text-right border border-gray-200 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -632,6 +675,7 @@ export default function BudgetPlanningPage() {
                       <td className="px-4 py-3 text-sm text-gray-900 sticky left-0 bg-gray-100">
                         Total
                       </td>
+                      <td className="px-4 py-3 text-sm text-gray-500 bg-gray-100"></td>
                       <td className="px-4 py-3 text-sm text-gray-900 text-right">
                         {formatAmount(rows.reduce((sum, r) => sum + (r.yearlyAmount || 0), 0))}
                       </td>
