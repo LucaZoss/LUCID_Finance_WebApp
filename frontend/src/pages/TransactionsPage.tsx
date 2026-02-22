@@ -183,11 +183,12 @@ export default function TransactionsPage() {
 
   const saveBulkEdit = async () => {
     try {
-      // Convert empty string sub_type to null
-      const updateValues = {
-        ...bulkEditValues,
-        sub_type: bulkEditValues.sub_type || null,
-      };
+      // Only include non-empty values in the update
+      const updateValues: { type?: string; category?: string; sub_type?: string | null } = {};
+      if (bulkEditValues.type) updateValues.type = bulkEditValues.type;
+      if (bulkEditValues.category) updateValues.category = bulkEditValues.category;
+      if (bulkEditValues.sub_type) updateValues.sub_type = bulkEditValues.sub_type;
+
       await api.bulkUpdateTransactions(Array.from(selectedIds), updateValues);
       // Reload transactions to get updated data
       await loadTransactions();
