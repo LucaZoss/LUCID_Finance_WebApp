@@ -16,6 +16,13 @@ from ...data_pipeline.pipeline import TransactionPipeline
 router = APIRouter(prefix="/api/transactions", tags=["Transactions"])
 
 
+def auto_set_sub_type(category: str, sub_type: Optional[str]) -> Optional[str]:
+    """Auto-set sub_type to 'Essentials' for Housing and Health Insurance categories."""
+    if category in ["Housing", "Health Insurance"]:
+        return "Essentials"
+    return sub_type
+
+
 @router.get("", response_model=List[TransactionResponse])
 def get_transactions(
     year: Optional[int] = None,
@@ -87,6 +94,11 @@ def update_transaction(
         transaction.type = update.type
     if update.category is not None:
         transaction.category = update.category
+        # Auto-set sub_type for Housing and Health Insurance
+        transaction.sub_type = auto_set_sub_type(update.category, update.sub_type)
+    elif update.sub_type is not None:
+        # If only sub_type is being updated, apply auto-set logic
+        transaction.sub_type = auto_set_sub_type(transaction.category, update.sub_type)
 
     session.commit()
     session.refresh(transaction)
@@ -116,6 +128,11 @@ def bulk_update_transactions(
             transaction.type = bulk_update.type
         if bulk_update.category is not None:
             transaction.category = bulk_update.category
+            # Auto-set sub_type for Housing and Health Insurance
+            transaction.sub_type = auto_set_sub_type(bulk_update.category, bulk_update.sub_type)
+        elif bulk_update.sub_type is not None:
+            # If only sub_type is being updated, apply auto-set logic
+            transaction.sub_type = auto_set_sub_type(transaction.category, bulk_update.sub_type)
         updated_count += 1
 
     session.commit()

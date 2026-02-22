@@ -330,24 +330,35 @@ export default function BudgetPlanningPage() {
     setSelectedRows(newSelection);
   };
 
-  const getTypeColor = (type: string) => {
-    // For rows, we check the actual type, not the group name
-    switch (type) {
-      case 'Income':
+  const getTypeColor = (type: string, sub_type: string | null) => {
+    if (type === 'Income') {
+      return 'border-l-green-500 bg-green-50';
+    } else if (type === 'Expenses') {
+      if (sub_type === 'Essentials') {
         return 'border-l-green-500 bg-green-50';
-      case 'Expenses':
-        return 'border-l-red-500 bg-red-50';
-      case 'Savings':
+      } else if (sub_type === 'Needs') {
         return 'border-l-blue-500 bg-blue-50';
-      default:
-        return 'border-l-gray-500 bg-gray-50';
+      } else if (sub_type === 'Wants') {
+        return 'border-l-purple-500 bg-purple-50';
+      } else {
+        return 'border-l-red-500 bg-red-50';
+      }
+    } else if (type === 'Savings') {
+      return 'border-l-blue-500 bg-blue-50';
     }
+    return 'border-l-gray-500 bg-gray-50';
   };
 
   const getGroupHeaderColor = (groupName: string) => {
     if (groupName === 'Income') {
       return 'bg-green-50';
-    } else if (groupName.startsWith('Expenses')) {
+    } else if (groupName === 'Expenses - Essentials') {
+      return 'bg-green-50';
+    } else if (groupName === 'Expenses - Needs') {
+      return 'bg-blue-50';
+    } else if (groupName === 'Expenses - Wants') {
+      return 'bg-purple-50';
+    } else if (groupName === 'Expenses - Other') {
       return 'bg-red-50';
     } else if (groupName === 'Savings') {
       return 'bg-blue-50';
@@ -586,9 +597,6 @@ export default function BudgetPlanningPage() {
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase sticky left-0 bg-gray-50">
                         Category
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                        Sub-Type
-                      </th>
                       <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
                         Yearly
                       </th>
@@ -604,7 +612,7 @@ export default function BudgetPlanningPage() {
                   </thead>
                   <tbody className="divide-y divide-gray-200">
                     {rows.map((row, index) => (
-                      <tr key={index} className={`hover:bg-gray-50 border-l-4 ${getTypeColor(row.type)}`}>
+                      <tr key={index} className={`hover:bg-gray-50 border-l-4 ${getTypeColor(row.type, row.sub_type)}`}>
                         <td className="px-2 py-3 text-center sticky left-0 bg-white">
                           <input
                             type="checkbox"
@@ -615,21 +623,6 @@ export default function BudgetPlanningPage() {
                         </td>
                         <td className="px-4 py-3 text-sm font-medium text-gray-900 sticky left-0 bg-white">
                           {row.category}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-900">
-                          <select
-                            value={row.sub_type || ''}
-                            onChange={(e) => {
-                              const newSubType = e.target.value || null;
-                              handleSaveBudget(row.type, row.category, row.yearlyAmount, undefined, newSubType);
-                            }}
-                            className="w-full px-2 py-1 text-sm border border-gray-200 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                          >
-                            <option value="">None</option>
-                            <option value="Essentials">Essentials</option>
-                            <option value="Needs">Needs</option>
-                            <option value="Wants">Wants</option>
-                          </select>
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-900 text-right">
                           <input
@@ -681,7 +674,6 @@ export default function BudgetPlanningPage() {
                       <td className="px-4 py-3 text-sm text-gray-900 sticky left-0 bg-gray-100">
                         Total
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-500 bg-gray-100"></td>
                       <td className="px-4 py-3 text-sm text-gray-900 text-right">
                         {formatAmount(rows.reduce((sum, r) => sum + (r.yearlyAmount || 0), 0))}
                       </td>

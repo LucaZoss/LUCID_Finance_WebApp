@@ -36,6 +36,7 @@ class BulkTransactionUpdate(BaseModel):
     transaction_ids: List[int]
     type: Optional[str] = None
     category: Optional[str] = None
+    sub_type: Optional[str] = None
 
 
 # Budget schemas

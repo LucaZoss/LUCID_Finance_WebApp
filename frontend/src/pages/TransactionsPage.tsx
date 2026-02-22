@@ -12,12 +12,12 @@ export default function TransactionsPage() {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [editValues, setEditValues] = useState({ type: '', category: '' });
+  const [editValues, setEditValues] = useState({ type: '', category: '', sub_type: '' });
 
   // Bulk edit
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [isBulkEditMode, setIsBulkEditMode] = useState(false);
-  const [bulkEditValues, setBulkEditValues] = useState({ type: '', category: '' });
+  const [bulkEditValues, setBulkEditValues] = useState({ type: '', category: '', sub_type: '' });
 
   // Filters
   const [filterYear, setFilterYear] = useState<number | undefined>();
@@ -28,9 +28,6 @@ export default function TransactionsPage() {
   const [filterAmountMin, setFilterAmountMin] = useState<string>('');
   const [filterAmountMax, setFilterAmountMax] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState('');
-
-  // Column visibility
-  const [showSubTypeColumn, setShowSubTypeColumn] = useState(false);
 
   // Upload refs
   const ubsFileRef = useRef<HTMLInputElement>(null);
@@ -113,12 +110,12 @@ export default function TransactionsPage() {
 
   const startEdit = (transaction: Transaction) => {
     setEditingId(transaction.id);
-    setEditValues({ type: transaction.type, category: transaction.category });
+    setEditValues({ type: transaction.type, category: transaction.category, sub_type: transaction.sub_type || '' });
   };
 
   const cancelEdit = () => {
     setEditingId(null);
-    setEditValues({ type: '', category: '' });
+    setEditValues({ type: '', category: '', sub_type: '' });
   };
 
   const saveEdit = async (id: number) => {
@@ -175,13 +172,13 @@ export default function TransactionsPage() {
     // Set default values from first selected transaction
     const firstSelected = transactions.find((t) => selectedIds.has(t.id));
     if (firstSelected) {
-      setBulkEditValues({ type: firstSelected.type, category: firstSelected.category });
+      setBulkEditValues({ type: firstSelected.type, category: firstSelected.category, sub_type: firstSelected.sub_type || '' });
     }
   };
 
   const cancelBulkEdit = () => {
     setIsBulkEditMode(false);
-    setBulkEditValues({ type: '', category: '' });
+    setBulkEditValues({ type: '', category: '', sub_type: '' });
   };
 
   const saveBulkEdit = async () => {
@@ -435,15 +432,6 @@ export default function TransactionsPage() {
               <RefreshCw className="w-4 h-4 mr-1" />
               Refresh
             </Button>
-            {hasSubTypes && (
-              <Button
-                variant={showSubTypeColumn ? "primary" : "outline"}
-                size="sm"
-                onClick={() => setShowSubTypeColumn(!showSubTypeColumn)}
-              >
-                {showSubTypeColumn ? 'Hide' : 'Show'} Sub-Type
-              </Button>
-            )}
           </div>
         </div>
       </Card>
@@ -464,6 +452,7 @@ export default function TransactionsPage() {
                       setBulkEditValues({
                         type: e.target.value,
                         category: getCategoriesForType(e.target.value)[0] || '',
+                        sub_type: bulkEditValues.sub_type,
                       });
                     }}
                     className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg"
@@ -486,6 +475,18 @@ export default function TransactionsPage() {
                         {c}
                       </option>
                     ))}
+                  </select>
+                  <select
+                    value={bulkEditValues.sub_type || ''}
+                    onChange={(e) =>
+                      setBulkEditValues({ ...bulkEditValues, sub_type: e.target.value || '' })
+                    }
+                    className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg"
+                  >
+                    <option value="">None</option>
+                    <option value="Essentials">Essentials</option>
+                    <option value="Needs">Needs</option>
+                    <option value="Wants">Wants</option>
                   </select>
                 </>
               )}
@@ -570,11 +571,9 @@ export default function TransactionsPage() {
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                     Category
                   </th>
-                  {showSubTypeColumn && (
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Sub-Type
-                    </th>
-                  )}
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    Sub-Type
+                  </th>
                   <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
                     Amount
                   </th>
@@ -611,6 +610,7 @@ export default function TransactionsPage() {
                             setEditValues({
                               type: e.target.value,
                               category: getCategoriesForType(e.target.value)[0] || '',
+                              sub_type: editValues.sub_type,
                             });
                           }}
                           className="px-2 py-1 text-sm border border-gray-300 rounded"
@@ -651,11 +651,24 @@ export default function TransactionsPage() {
                         <span className="text-sm text-gray-900">{transaction.category}</span>
                       )}
                     </td>
-                    {showSubTypeColumn && (
-                      <td className="px-4 py-3 text-sm text-gray-600">
-                        {transaction.sub_type || '-'}
-                      </td>
-                    )}
+                    <td className="px-4 py-3">
+                      {editingId === transaction.id ? (
+                        <select
+                          value={editValues.sub_type || ''}
+                          onChange={(e) =>
+                            setEditValues({ ...editValues, sub_type: e.target.value || '' })
+                          }
+                          className="px-2 py-1 text-sm border border-gray-300 rounded"
+                        >
+                          <option value="">None</option>
+                          <option value="Essentials">Essentials</option>
+                          <option value="Needs">Needs</option>
+                          <option value="Wants">Wants</option>
+                        </select>
+                      ) : (
+                        <span className="text-sm text-gray-600">{transaction.sub_type || '-'}</span>
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-sm text-gray-900 text-right font-medium whitespace-nowrap">
                       {formatAmount(transaction.amount)}
                     </td>
