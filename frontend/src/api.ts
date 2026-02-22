@@ -132,6 +132,7 @@ export const getBudgets = async (year?: number): Promise<BudgetPlan[]> => {
 export const createBudget = async (budget: {
   type: string;
   category: string;
+  sub_type?: string | null;
   year: number;
   month?: number | null;
   amount: number;

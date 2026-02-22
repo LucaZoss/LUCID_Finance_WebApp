@@ -3,6 +3,7 @@ export interface Transaction {
   date: string;
   type: string;
   category: string;
+  sub_type?: string | null;
   amount: number;
   description: string | null;
   source: string;
@@ -15,6 +16,7 @@ export interface BudgetPlan {
   id: number;
   type: string;
   category: string;
+  sub_type?: string | null;
   year: number;
   month: number | null;
   amount: number;

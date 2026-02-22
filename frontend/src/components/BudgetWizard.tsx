@@ -199,6 +199,7 @@ export default function BudgetWizard({ onClose, onSuccess, selectedYear }: Budge
         budgetsToCreate.push({
           type: 'Income',
           category: 'Employment',
+          sub_type: 'Essentials',
           year: selectedYear,
           month: null,
           amount: formData.annualIncome,
@@ -210,6 +211,7 @@ export default function BudgetWizard({ onClose, onSuccess, selectedYear }: Budge
         budgetsToCreate.push({
           type: 'Expenses',
           category: 'Housing',
+          sub_type: 'Essentials',
           year: selectedYear,
           month: null,
           amount: formData.monthlyRent * 12,
@@ -221,6 +223,7 @@ export default function BudgetWizard({ onClose, onSuccess, selectedYear }: Budge
         budgetsToCreate.push({
           type: 'Expenses',
           category: 'Health Insurance',
+          sub_type: 'Essentials',
           year: selectedYear,
           month: null,
           amount: formData.healthInsurance * 12,
@@ -234,6 +237,7 @@ export default function BudgetWizard({ onClose, onSuccess, selectedYear }: Budge
           budgetsToCreate.push({
             type: 'Expenses',
             category: need.categoryName,
+            sub_type: 'Needs',
             year: selectedYear,
             month: null,
             amount: need.monthlyAmount * 12,
@@ -247,6 +251,7 @@ export default function BudgetWizard({ onClose, onSuccess, selectedYear }: Budge
           budgetsToCreate.push({
             type: 'Expenses',
             category: want.categoryName,
+            sub_type: 'Wants',
             year: selectedYear,
             month: null,
             amount: want.monthlyAmount * 12,
@@ -259,6 +264,7 @@ export default function BudgetWizard({ onClose, onSuccess, selectedYear }: Budge
         budgetsToCreate.push({
           type: 'Savings',
           category: 'General Savings',
+          sub_type: null,
           year: selectedYear,
           month: null,
           amount: monthlySavings * 12,
