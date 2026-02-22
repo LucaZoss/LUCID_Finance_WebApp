@@ -24,9 +24,13 @@ export default function TransactionsPage() {
   const [filterMonth, setFilterMonth] = useState<number | undefined>();
   const [filterType, setFilterType] = useState<string>('');
   const [filterCategory, setFilterCategory] = useState<string>('');
+  const [filterSubType, setFilterSubType] = useState<string>('');
   const [filterAmountMin, setFilterAmountMin] = useState<string>('');
   const [filterAmountMax, setFilterAmountMax] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState('');
+
+  // Column visibility
+  const [showSubTypeColumn, setShowSubTypeColumn] = useState(false);
 
   // Upload refs
   const ubsFileRef = useRef<HTMLInputElement>(null);
@@ -43,7 +47,7 @@ export default function TransactionsPage() {
 
   useEffect(() => {
     loadTransactions();
-  }, [filterYear, filterMonth, filterType, filterCategory, filterAmountMin, filterAmountMax]);
+  }, [filterYear, filterMonth, filterType, filterCategory, filterSubType, filterAmountMin, filterAmountMax]);
 
   const loadInitialData = async () => {
     try {
@@ -207,17 +211,29 @@ export default function TransactionsPage() {
     setFilterMonth(undefined);
     setFilterType('');
     setFilterCategory('');
+    setFilterSubType('');
     setFilterAmountMin('');
     setFilterAmountMax('');
     setSearchTerm('');
   };
 
-  const filteredTransactions = transactions.filter((t) =>
-    searchTerm
+  const filteredTransactions = transactions.filter((t) => {
+    // Search term filter
+    const matchesSearch = searchTerm
       ? t.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         t.category.toLowerCase().includes(searchTerm.toLowerCase())
-      : true
-  );
+      : true;
+
+    // Sub-type filter
+    const matchesSubType = filterSubType
+      ? t.sub_type === filterSubType
+      : true;
+
+    return matchesSearch && matchesSubType;
+  });
+
+  // Check if any transactions have sub_type
+  const hasSubTypes = transactions.some((t) => t.sub_type != null);
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
@@ -351,6 +367,21 @@ export default function TransactionsPage() {
             className="text-sm min-w-[150px]"
           />
 
+          {hasSubTypes && (
+            <Select
+              label="Sub-Type"
+              value={filterSubType}
+              onChange={(e) => setFilterSubType(e.target.value)}
+              options={[
+                { value: '', label: 'All Sub-Types' },
+                { value: 'Essentials', label: 'Essentials' },
+                { value: 'Needs', label: 'Needs' },
+                { value: 'Wants', label: 'Wants' },
+              ]}
+              className="text-sm min-w-[140px]"
+            />
+          )}
+
           <Input
             label="Min Amount"
             type="number"
@@ -404,6 +435,15 @@ export default function TransactionsPage() {
               <RefreshCw className="w-4 h-4 mr-1" />
               Refresh
             </Button>
+            {hasSubTypes && (
+              <Button
+                variant={showSubTypeColumn ? "primary" : "outline"}
+                size="sm"
+                onClick={() => setShowSubTypeColumn(!showSubTypeColumn)}
+              >
+                {showSubTypeColumn ? 'Hide' : 'Show'} Sub-Type
+              </Button>
+            )}
           </div>
         </div>
       </Card>
@@ -530,6 +570,11 @@ export default function TransactionsPage() {
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                     Category
                   </th>
+                  {showSubTypeColumn && (
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      Sub-Type
+                    </th>
+                  )}
                   <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
                     Amount
                   </th>
@@ -606,6 +651,11 @@ export default function TransactionsPage() {
                         <span className="text-sm text-gray-900">{transaction.category}</span>
                       )}
                     </td>
+                    {showSubTypeColumn && (
+                      <td className="px-4 py-3 text-sm text-gray-600">
+                        {transaction.sub_type || '-'}
+                      </td>
+                    )}
                     <td className="px-4 py-3 text-sm text-gray-900 text-right font-medium whitespace-nowrap">
                       {formatAmount(transaction.amount)}
                     </td>

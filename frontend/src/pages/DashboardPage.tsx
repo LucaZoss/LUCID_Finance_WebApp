@@ -28,6 +28,7 @@ export default function DashboardPage() {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState<number | undefined>();
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [selectedSubType, setSelectedSubType] = useState<string>('');
   const [years, setYears] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
   const [initialFiltersSet, setInitialFiltersSet] = useState(false);
@@ -41,7 +42,7 @@ export default function DashboardPage() {
     if (initialFiltersSet) {
       loadDashboardData();
     }
-  }, [selectedYear, selectedMonth, selectedCategories, initialFiltersSet]);
+  }, [selectedYear, selectedMonth, selectedCategories, selectedSubType, initialFiltersSet]);
 
   const initializeFilters = async () => {
     try {
@@ -118,8 +119,54 @@ export default function DashboardPage() {
     );
   }
 
+  // Filter summary data by sub_type if selected
+  const filteredIncome = selectedSubType
+    ? summary.income.filter((item) => (item as any).sub_type === selectedSubType)
+    : summary.income;
+  const filteredExpenses = selectedSubType
+    ? summary.expenses.filter((item) => (item as any).sub_type === selectedSubType)
+    : summary.expenses;
+  const filteredSavings = selectedSubType
+    ? summary.savings.filter((item) => (item as any).sub_type === selectedSubType)
+    : summary.savings;
+
+  // Calculate filtered totals
+  const filteredTotals = {
+    income: {
+      actual: filteredIncome.reduce((sum, item) => sum + item.actual, 0),
+      budget: filteredIncome.reduce((sum, item) => sum + item.budget, 0),
+    },
+    expenses: {
+      actual: filteredExpenses.reduce((sum, item) => sum + item.actual, 0),
+      budget: filteredExpenses.reduce((sum, item) => sum + item.budget, 0),
+    },
+    savings: {
+      actual: filteredSavings.reduce((sum, item) => sum + item.actual, 0),
+      budget: filteredSavings.reduce((sum, item) => sum + item.budget, 0),
+    },
+    net: {
+      actual: 0,
+      budget: 0,
+    },
+  };
+  filteredTotals.net.actual = filteredTotals.income.actual - filteredTotals.expenses.actual - filteredTotals.savings.actual;
+  filteredTotals.net.budget = filteredTotals.income.budget - filteredTotals.expenses.budget - filteredTotals.savings.budget;
+
+  const displaySummary = selectedSubType ? {
+    ...summary,
+    income: filteredIncome,
+    expenses: filteredExpenses,
+    savings: filteredSavings,
+    totals: filteredTotals,
+  } : summary;
+
+  // Check if any items have sub_type
+  const hasSubTypes = [...summary.income, ...summary.expenses, ...summary.savings].some(
+    (item) => (item as any).sub_type != null
+  );
+
   // Prepare data for charts
-  const topExpenses = summary.expenses
+  const topExpenses = displaySummary.expenses
     .sort((a, b) => b.actual - a.actual)
     .slice(0, 10)
     .map((item) => ({
@@ -130,9 +177,9 @@ export default function DashboardPage() {
     }));
 
   const pieData = [
-    { name: 'Income', value: summary.totals.income.actual, color: CHART_COLORS.income },
-    { name: 'Expenses', value: summary.totals.expenses.actual, color: CHART_COLORS.expenses },
-    { name: 'Savings', value: summary.totals.savings.actual, color: CHART_COLORS.savings },
+    { name: 'Income', value: displaySummary.totals.income.actual, color: CHART_COLORS.income },
+    { name: 'Expenses', value: displaySummary.totals.expenses.actual, color: CHART_COLORS.expenses },
+    { name: 'Savings', value: displaySummary.totals.savings.actual, color: CHART_COLORS.savings },
   ];
 
   const trendChartData = monthlyTrend.map((item) => ({
@@ -145,7 +192,7 @@ export default function DashboardPage() {
     SavingsBudget: item.SavingsBudget,
   }));
 
-  const netActual = summary.totals.net.actual;
+  const netActual = displaySummary.totals.net.actual;
   const isPositiveNet = netActual >= 0;
 
   return (
@@ -185,6 +232,21 @@ export default function DashboardPage() {
             ]}
             className="text-sm"
           />
+
+          {hasSubTypes && (
+            <Select
+              label="Sub-Type"
+              value={selectedSubType}
+              onChange={(e) => setSelectedSubType(e.target.value)}
+              options={[
+                { value: '', label: 'All' },
+                { value: 'Essentials', label: 'Essentials' },
+                { value: 'Needs', label: 'Needs' },
+                { value: 'Wants', label: 'Wants' },
+              ]}
+              className="text-sm"
+            />
+          )}
 
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1">
@@ -237,14 +299,14 @@ export default function DashboardPage() {
             <span className="text-xs font-medium text-gray-500">INCOME</span>
           </div>
           <div>
-            <p className="text-2xl font-bold text-gray-900">{formatAmount(summary.totals.income.actual)}</p>
+            <p className="text-2xl font-bold text-gray-900">{formatAmount(displaySummary.totals.income.actual)}</p>
             <p className="text-sm text-gray-500 mt-1">
-              Budget: {formatAmount(summary.totals.income.budget)}
+              Budget: {formatAmount(displaySummary.totals.income.budget)}
             </p>
             <div className="mt-3">
               {(() => {
-                const incomePercent = summary.totals.income.budget > 0
-                  ? (summary.totals.income.actual / summary.totals.income.budget) * 100
+                const incomePercent = displaySummary.totals.income.budget > 0
+                  ? (displaySummary.totals.income.actual / displaySummary.totals.income.budget) * 100
                   : 0;
                 const colorClass = incomePercent < 100
                   ? 'bg-red-100 text-red-700 border-red-300'
@@ -270,14 +332,14 @@ export default function DashboardPage() {
             <span className="text-xs font-medium text-gray-500">EXPENSES</span>
           </div>
           <div>
-            <p className="text-2xl font-bold text-gray-900">{formatAmount(summary.totals.expenses.actual)}</p>
+            <p className="text-2xl font-bold text-gray-900">{formatAmount(displaySummary.totals.expenses.actual)}</p>
             <p className="text-sm text-gray-500 mt-1">
-              Budget: {formatAmount(summary.totals.expenses.budget)}
+              Budget: {formatAmount(displaySummary.totals.expenses.budget)}
             </p>
             <div className="mt-3">
               {(() => {
-                const expensePercent = summary.totals.expenses.budget > 0
-                  ? (summary.totals.expenses.actual / summary.totals.expenses.budget) * 100
+                const expensePercent = displaySummary.totals.expenses.budget > 0
+                  ? (displaySummary.totals.expenses.actual / displaySummary.totals.expenses.budget) * 100
                   : 0;
                 const colorClass = expensePercent < 100
                   ? 'bg-green-100 text-green-700 border-green-300'
