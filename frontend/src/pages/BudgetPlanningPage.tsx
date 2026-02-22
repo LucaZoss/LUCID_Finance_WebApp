@@ -186,11 +186,9 @@ export default function BudgetPlanningPage() {
 
       const row = rowMap.get(key)!;
       row.budgetIds.push(budget.id);
-      // Update sub_type if this is the yearly budget
-      if (budget.month === null && budget.sub_type) {
-        row.sub_type = budget.sub_type;
-      }
+      // Update sub_type from yearly budget (even if null)
       if (budget.month === null) {
+        row.sub_type = budget.sub_type || null;
         row.yearlyAmount = budget.amount;
       } else {
         row.monthlyAmounts[budget.month] = budget.amount;
@@ -333,6 +331,7 @@ export default function BudgetPlanningPage() {
   };
 
   const getTypeColor = (type: string) => {
+    // For rows, we check the actual type, not the group name
     switch (type) {
       case 'Income':
         return 'border-l-green-500 bg-green-50';
@@ -345,9 +344,25 @@ export default function BudgetPlanningPage() {
     }
   };
 
+  const getGroupHeaderColor = (groupName: string) => {
+    if (groupName === 'Income') {
+      return 'bg-green-50';
+    } else if (groupName.startsWith('Expenses')) {
+      return 'bg-red-50';
+    } else if (groupName === 'Savings') {
+      return 'bg-blue-50';
+    }
+    return 'bg-gray-50';
+  };
+
+  const expenseRows = budgetRows.filter((r) => r.type === 'Expenses');
+
   const groupedRows = {
     Income: budgetRows.filter((r) => r.type === 'Income'),
-    Expenses: budgetRows.filter((r) => r.type === 'Expenses'),
+    'Expenses - Essentials': expenseRows.filter((r) => r.sub_type === 'Essentials'),
+    'Expenses - Needs': expenseRows.filter((r) => r.sub_type === 'Needs'),
+    'Expenses - Wants': expenseRows.filter((r) => r.sub_type === 'Wants'),
+    'Expenses - Other': expenseRows.filter((r) => !r.sub_type || (r.sub_type !== 'Essentials' && r.sub_type !== 'Needs' && r.sub_type !== 'Wants')),
     Savings: budgetRows.filter((r) => r.type === 'Savings'),
   };
 
@@ -543,29 +558,20 @@ export default function BudgetPlanningPage() {
           <p className="text-gray-500">Loading budgets...</p>
         </Card>
       ) : (
-        Object.entries(groupedRows).map(([type, rows]) => (
-          <Card key={type} className="border border-gray-200 overflow-hidden" shadow="sm" padding="none">
-            <div
-              className={`px-6 py-4 border-b border-gray-200 ${
-                type === 'Income'
-                  ? 'bg-green-50'
-                  : type === 'Expenses'
-                  ? 'bg-red-50'
-                  : 'bg-blue-50'
-              }`}
-            >
-              <h2 className="text-lg font-semibold text-gray-900 flex items-center">
-                <DollarSign className="w-5 h-5 mr-2" />
-                {type}
-              </h2>
-            </div>
+        Object.entries(groupedRows).map(([groupName, rows]) => {
+          // Skip empty groups
+          if (rows.length === 0) return null;
 
-            {rows.length === 0 ? (
-              <div className="p-6 text-center text-gray-500">
-                No budgets set for {type}. Click "Add Budget" to create one.
+          return (
+            <Card key={groupName} className="border border-gray-200 overflow-hidden" shadow="sm" padding="none">
+              <div className={`px-6 py-4 border-b border-gray-200 ${getGroupHeaderColor(groupName)}`}>
+                <h2 className="text-lg font-semibold text-gray-900 flex items-center">
+                  <DollarSign className="w-5 h-5 mr-2" />
+                  {groupName}
+                </h2>
               </div>
-            ) : (
-              <div className="overflow-x-auto">
+
+            <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead className="bg-gray-50">
                     <tr>
@@ -573,7 +579,7 @@ export default function BudgetPlanningPage() {
                         <input
                           type="checkbox"
                           checked={rows.length > 0 && rows.every((row) => selectedRows.has(`${row.type}-${row.category}`))}
-                          onChange={() => toggleAllInType(type, rows)}
+                          onChange={() => toggleAllInType(rows[0]?.type || 'Expenses', rows)}
                           className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
                         />
                       </th>
@@ -690,9 +696,9 @@ export default function BudgetPlanningPage() {
                   </tfoot>
                 </table>
               </div>
-            )}
-          </Card>
-        ))
+            </Card>
+          );
+        })
       )}
 
       {/* Summary Card */}
@@ -708,7 +714,9 @@ export default function BudgetPlanningPage() {
           <div className="p-4 bg-red-50 rounded-lg">
             <p className="text-sm text-red-600 font-medium">Total Expenses Budget</p>
             <p className="text-2xl font-bold text-red-700">
-              CHF {formatAmount(groupedRows.Expenses.reduce((sum, r) => sum + (r.yearlyAmount || 0), 0))}
+              CHF {formatAmount(
+                expenseRows.reduce((sum, r) => sum + (r.yearlyAmount || 0), 0)
+              )}
             </p>
           </div>
           <div className="p-4 bg-blue-50 rounded-lg">
@@ -723,7 +731,7 @@ export default function BudgetPlanningPage() {
               CHF{' '}
               {formatAmount(
                 groupedRows.Income.reduce((sum, r) => sum + (r.yearlyAmount || 0), 0) -
-                  groupedRows.Expenses.reduce((sum, r) => sum + (r.yearlyAmount || 0), 0) -
+                  expenseRows.reduce((sum, r) => sum + (r.yearlyAmount || 0), 0) -
                   groupedRows.Savings.reduce((sum, r) => sum + (r.yearlyAmount || 0), 0)
               )}
             </p>
