@@ -122,7 +122,7 @@ export const uploadFiles = async (
   if (ubsFile) formData.append('ubs_file', ubsFile);
   if (ccFile) formData.append('cc_file', ccFile);
 
-  const { data } = await api.post('/upload', formData, {
+  const { data } = await api.post('/transactions/upload', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   });
   return data;
