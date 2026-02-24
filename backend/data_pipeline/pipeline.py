@@ -262,7 +262,7 @@ class TransactionPipeline:
         logger.info(f"Found {len(ubs_files)} UBS, {len(cc_files)} CC, {len(generic_files)} generic files")
         return ubs_files, cc_files, generic_files
 
-    def _process_ubs_file(self, filepath: str) -> dict:
+    def _process_ubs_file(self, filepath: str, user_id: int = 1) -> dict:
         """Process a single UBS file through the ETL pipeline."""
         filename = os.path.basename(filepath)
         logger.info(f"Processing UBS file: {filename}")
@@ -280,14 +280,14 @@ class TransactionPipeline:
             logger.warning(f"Validation errors: {len(errors)}")
 
         # Load
-        stats = self.loader.load(valid)
+        stats = self.loader.load(valid, user_id=user_id)
 
         # Mark as processed
         self.file_tracker.mark_processed(filename, "UBS", len(valid))
 
         return stats
 
-    def _process_cc_file(self, filepath: str) -> dict:
+    def _process_cc_file(self, filepath: str, user_id: int = 1) -> dict:
         """Process a single CC file through the ETL pipeline."""
         filename = os.path.basename(filepath)
         logger.info(f"Processing CC file: {filename}")
@@ -305,14 +305,14 @@ class TransactionPipeline:
             logger.warning(f"Validation errors: {len(errors)}")
 
         # Load
-        stats = self.loader.load(valid)
+        stats = self.loader.load(valid, user_id=user_id)
 
         # Mark as processed
         self.file_tracker.mark_processed(filename, "CC", len(valid))
 
         return stats
 
-    def _process_generic_file(self, filepath: str, file_type: str) -> dict:
+    def _process_generic_file(self, filepath: str, file_type: str, user_id: int = 1) -> dict:
         """Process a generic CSV file (BCV, Generic) through the ETL pipeline."""
         filename = os.path.basename(filepath)
         logger.info(f"Processing {file_type} file: {filename}")
@@ -330,7 +330,7 @@ class TransactionPipeline:
             logger.warning(f"Validation errors: {len(errors)}")
 
         # Load
-        stats = self.loader.load(valid)
+        stats = self.loader.load(valid, user_id=user_id)
 
         # Mark as processed
         self.file_tracker.mark_processed(filename, file_type, len(valid))

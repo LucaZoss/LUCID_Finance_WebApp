@@ -31,6 +31,7 @@ class TransactionLoader:
     def load(
         self,
         transactions: List[TransformedTransaction],
+        user_id: int = 1,
         session: Optional[Session] = None,
     ) -> dict:
         """
@@ -38,6 +39,7 @@ class TransactionLoader:
 
         Args:
             transactions: List of transformed transactions
+            user_id: User ID to associate with transactions (defaults to 1 for admin)
             session: Optional existing session (creates new if not provided)
 
         Returns:
@@ -48,8 +50,8 @@ class TransactionLoader:
             session = self.db_manager.get_session()
 
         try:
-            # Get existing hashes for deduplication
-            existing_hashes = self._get_existing_hashes(session)
+            # Get existing hashes for deduplication (per user)
+            existing_hashes = self._get_existing_hashes(session, user_id)
 
             inserted = 0
             skipped = 0
@@ -63,6 +65,7 @@ class TransactionLoader:
 
                 try:
                     transaction = Transaction(
+                        user_id=user_id,
                         date=trans.date.date() if isinstance(trans.date, datetime) else trans.date,
                         type=trans.type,
                         category=trans.category,
@@ -107,9 +110,11 @@ class TransactionLoader:
             if own_session:
                 session.close()
 
-    def _get_existing_hashes(self, session: Session) -> Set[str]:
-        """Get all existing transaction hashes for deduplication."""
-        result = session.query(Transaction.transaction_hash).all()
+    def _get_existing_hashes(self, session: Session, user_id: int) -> Set[str]:
+        """Get all existing transaction hashes for deduplication (per user)."""
+        result = session.query(Transaction.transaction_hash).filter(
+            Transaction.user_id == user_id
+        ).all()
         return {r[0] for r in result}
 
 

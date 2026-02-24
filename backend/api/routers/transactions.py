@@ -217,10 +217,12 @@ def bulk_update_by_criteria(
 
 @router.post("/upload")
 async def upload_csv(
+    request: Request,
     ubs_file: Optional[UploadFile] = File(None),
     cc_file: Optional[UploadFile] = File(None),
+    current_user: dict = Depends(get_current_user),
 ):
-    """Upload UBS and/or CC CSV files for processing."""
+    """Upload bank CSV files for processing (UBS, CC, BCV, or any bank format)."""
     if not ubs_file and not cc_file:
         raise HTTPException(status_code=400, detail="At least one file must be provided")
 
@@ -228,40 +230,58 @@ async def upload_csv(
     upload_dir = Path("temp_uploads")
     upload_dir.mkdir(exist_ok=True)
 
-    ubs_path = None
-    cc_path = None
+    uploaded_files = []
 
     try:
         # Save uploaded files
         if ubs_file:
-            ubs_path = upload_dir / ubs_file.filename
-            with open(ubs_path, "wb") as f:
+            file_path = upload_dir / ubs_file.filename
+            with open(file_path, "wb") as f:
                 shutil.copyfileobj(ubs_file.file, f)
+            uploaded_files.append(file_path)
 
         if cc_file:
-            cc_path = upload_dir / cc_file.filename
-            with open(cc_path, "wb") as f:
+            file_path = upload_dir / cc_file.filename
+            with open(file_path, "wb") as f:
                 shutil.copyfileobj(cc_file.file, f)
+            uploaded_files.append(file_path)
 
-        # Process files
+        # Process files with auto-detection
+        from ...data_pipeline.extractors import identify_file_type
+
         pipeline = TransactionPipeline()
-        stats = pipeline.process_files(
-            ubs_file=str(ubs_path) if ubs_path else None,
-            cc_file=str(cc_path) if cc_path else None,
-            force=False,
-        )
+        pipeline.setup_database()
+
+        total_stats = {"inserted": 0, "skipped": 0, "errors": 0, "total": 0}
+
+        for file_path in uploaded_files:
+            # Auto-detect file type
+            file_type = identify_file_type(file_path)
+
+            # Process based on file type
+            if file_type == "UBS":
+                stats = pipeline._process_ubs_file(str(file_path), user_id=current_user["id"])
+            elif file_type == "CC":
+                stats = pipeline._process_cc_file(str(file_path), user_id=current_user["id"])
+            else:  # BCV or Generic
+                stats = pipeline._process_generic_file(str(file_path), file_type, user_id=current_user["id"])
+
+            # Aggregate stats
+            total_stats["inserted"] += stats.get("inserted", 0)
+            total_stats["skipped"] += stats.get("skipped", 0)
+            total_stats["errors"] += stats.get("errors", 0)
+            total_stats["total"] += stats.get("total", 0)
 
         return {
             "message": "Files processed successfully",
-            "stats": stats,
+            "stats": total_stats,
         }
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Upload failed. Please check the file format. Error: {str(e)}")
 
     finally:
         # Cleanup temp files
-        if ubs_path and ubs_path.exists():
-            ubs_path.unlink()
-        if cc_path and cc_path.exists():
-            cc_path.unlink()
+        for file_path in uploaded_files:
+            if file_path.exists():
+                file_path.unlink()
