@@ -96,7 +96,7 @@ def delete_user(
         raise HTTPException(status_code=404, detail="User not found")
 
     # Prevent self-deletion
-    if user.id == current_user["user_id"]:
+    if user.id == current_user["id"]:
         raise HTTPException(status_code=400, detail="Cannot delete yourself")
 
     # Prevent deleting the last admin
