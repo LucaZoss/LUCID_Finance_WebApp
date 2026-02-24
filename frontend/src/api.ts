@@ -70,6 +70,11 @@ export const getUsers = async (): Promise<User[]> => {
   return data;
 };
 
+export const deleteUser = async (userId: number): Promise<{ message: string }> => {
+  const { data } = await api.delete(`/auth/users/${userId}`);
+  return data;
+};
+
 // Transactions
 export const getTransactions = async (params?: {
   year?: number;

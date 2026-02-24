@@ -77,3 +77,39 @@ def list_users(
 def get_current_user_info(current_user: dict = Depends(get_current_user)):
     """Get current authenticated user info."""
     return current_user
+
+
+@router.delete("/users/{user_id}")
+def delete_user(
+    user_id: int,
+    current_user: dict = Depends(get_admin_user),
+    session: Session = Depends(get_db)
+):
+    """
+    Delete a user (admin only).
+
+    Cannot delete yourself or the last admin user.
+    """
+    # Check if user exists
+    user = session.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Prevent self-deletion
+    if user.id == current_user["user_id"]:
+        raise HTTPException(status_code=400, detail="Cannot delete yourself")
+
+    # Prevent deleting the last admin
+    if user.is_admin:
+        admin_count = session.query(User).filter(User.is_admin).count()
+        if admin_count <= 1:
+            raise HTTPException(
+                status_code=400,
+                detail="Cannot delete the last admin user"
+            )
+
+    # Delete the user
+    session.delete(user)
+    session.commit()
+
+    return {"message": f"User '{user.username}' deleted successfully"}

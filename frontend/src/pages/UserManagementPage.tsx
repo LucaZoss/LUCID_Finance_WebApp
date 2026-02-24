@@ -1,14 +1,17 @@
 import { useState, useEffect } from 'react';
-import { UserPlus, Shield, User as UserIcon } from 'lucide-react';
+import { UserPlus, Shield, User as UserIcon, Trash2 } from 'lucide-react';
 import * as api from '../api';
 import type { User, UserCreate } from '../api';
 import { getApiErrorMessage } from '../utils/errors';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function UserManagementPage() {
+  const { user: currentUser } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [deleting, setDeleting] = useState<number | null>(null);
 
   // Form state
   const [newUser, setNewUser] = useState<UserCreate>({
@@ -71,6 +74,35 @@ export default function UserManagementPage() {
       alert(getApiErrorMessage(error) || 'Failed to create user');
     } finally {
       setCreating(false);
+    }
+  };
+
+  const handleDeleteUser = async (user: User) => {
+    // Confirmation
+    const confirmMessage = `Are you sure you want to delete user "${user.username}"?\n\nThis action cannot be undone and will permanently delete:\n- User account\n- All associated data\n\nType DELETE to confirm:`;
+    const confirmation = prompt(confirmMessage);
+
+    if (confirmation !== 'DELETE') {
+      if (confirmation !== null) {
+        alert('Deletion cancelled. You must type DELETE exactly to confirm.');
+      }
+      return;
+    }
+
+    try {
+      setDeleting(user.id);
+      await api.deleteUser(user.id);
+
+      // Reload users
+      await loadUsers();
+
+      alert(`User "${user.username}" deleted successfully`);
+    } catch (error: unknown) {
+      console.error('Failed to delete user:', error);
+      const errorMsg = getApiErrorMessage(error);
+      alert(errorMsg || 'Failed to delete user');
+    } finally {
+      setDeleting(null);
     }
   };
 
@@ -226,12 +258,15 @@ export default function UserManagementPage() {
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Created
               </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Actions
+              </th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {users.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
+                <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
                   No users found
                 </td>
               </tr>
@@ -272,6 +307,20 @@ export default function UserManagementPage() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                     {new Date(user.created_at).toLocaleDateString()}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <button
+                      onClick={() => handleDeleteUser(user)}
+                      disabled={deleting === user.id || user.username === currentUser?.username}
+                      className="text-red-600 hover:text-red-900 disabled:opacity-50 disabled:cursor-not-allowed"
+                      title={user.username === currentUser?.username ? "Cannot delete yourself" : "Delete user"}
+                    >
+                      {deleting === user.id ? (
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600"></div>
+                      ) : (
+                        <Trash2 className="w-4 h-4" />
+                      )}
+                    </button>
                   </td>
                 </tr>
               ))
