@@ -21,7 +21,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from .config import PipelineConfig, DatabaseConfig
-from .extractors import UBSExtractor, CCExtractor, identify_file_type, RawTransaction
+from .extractors import UBSExtractor, CCExtractor, GenericExtractor, identify_file_type, RawTransaction
 from .transformers import TransactionTransformer, TransactionValidator, TransformedTransaction
 from .loaders import TransactionLoader, ProcessedFileTracker, TransactionExporter
 from .models import DatabaseManager
@@ -70,6 +70,7 @@ class TransactionPipeline:
         self.db_manager = DatabaseManager(self.config.database)
         self.ubs_extractor = UBSExtractor(self.config)
         self.cc_extractor = CCExtractor(self.config)
+        self.generic_extractor = GenericExtractor(self.config)
         self.transformer = TransactionTransformer(self.config, self.db_manager)
         self.validator = TransactionValidator(self.config)
         self.loader = TransactionLoader(self.db_manager)
@@ -115,9 +116,9 @@ class TransactionPipeline:
         self.setup_database()
 
         # Find unprocessed files
-        ubs_files, cc_files = self._find_csv_files(raw_folder, force)
+        ubs_files, cc_files, generic_files = self._find_csv_files(raw_folder, force)
 
-        if not ubs_files and not cc_files:
+        if not ubs_files and not cc_files and not generic_files:
             logger.info("No unprocessed files found. Exiting.")
             return {"status": "no_files", "processed": 0}
 
@@ -125,6 +126,7 @@ class TransactionPipeline:
         total_stats = {
             "ubs_files": 0,
             "cc_files": 0,
+            "generic_files": 0,
             "total_transactions": 0,
             "inserted": 0,
             "skipped": 0,
@@ -155,6 +157,19 @@ class TransactionPipeline:
                 total_stats["errors"] += stats.get("errors", 0)
             except Exception as e:
                 logger.error(f"Failed to process CC file {cc_file}: {e}")
+                total_stats["errors"] += 1
+
+        # Process Generic files (BCV, Generic)
+        for filepath, file_type in generic_files:
+            try:
+                stats = self._process_generic_file(filepath, file_type)
+                total_stats["generic_files"] += 1
+                total_stats["total_transactions"] += stats.get("total", 0)
+                total_stats["inserted"] += stats.get("inserted", 0)
+                total_stats["skipped"] += stats.get("skipped", 0)
+                total_stats["errors"] += stats.get("errors", 0)
+            except Exception as e:
+                logger.error(f"Failed to process generic file {filepath}: {e}")
                 total_stats["errors"] += 1
 
         # Export to CSV if output folder specified
@@ -212,12 +227,19 @@ class TransactionPipeline:
 
     def _find_csv_files(
         self, folder: str, force: bool = False
-    ) -> Tuple[List[str], List[str]]:
-        """Find UBS and CC CSV files in a folder."""
+    ) -> Tuple[List[str], List[str], List[Tuple[str, str]]]:
+        """
+        Find UBS, CC, BCV, and Generic CSV files in a folder.
+
+        Returns:
+            Tuple of (ubs_files, cc_files, generic_files_with_type)
+            generic_files_with_type is a list of (filepath, file_type) tuples
+        """
         all_files = glob.glob(os.path.join(folder, "*.csv"))
 
         ubs_files = []
         cc_files = []
+        generic_files = []  # List of (filepath, file_type) tuples
 
         for filepath in all_files:
             filename = os.path.basename(filepath)
@@ -232,11 +254,13 @@ class TransactionPipeline:
                 ubs_files.append(filepath)
             elif file_type == "CC":
                 cc_files.append(filepath)
+            elif file_type in ("BCV", "Generic"):
+                generic_files.append((filepath, file_type))
             else:
                 logger.warning(f"Unknown file type: {filename}")
 
-        logger.info(f"Found {len(ubs_files)} UBS files, {len(cc_files)} CC files")
-        return ubs_files, cc_files
+        logger.info(f"Found {len(ubs_files)} UBS, {len(cc_files)} CC, {len(generic_files)} generic files")
+        return ubs_files, cc_files, generic_files
 
     def _process_ubs_file(self, filepath: str) -> dict:
         """Process a single UBS file through the ETL pipeline."""
@@ -285,6 +309,31 @@ class TransactionPipeline:
 
         # Mark as processed
         self.file_tracker.mark_processed(filename, "CC", len(valid))
+
+        return stats
+
+    def _process_generic_file(self, filepath: str, file_type: str) -> dict:
+        """Process a generic CSV file (BCV, Generic) through the ETL pipeline."""
+        filename = os.path.basename(filepath)
+        logger.info(f"Processing {file_type} file: {filename}")
+
+        # Extract using GenericExtractor
+        raw_transactions = self.generic_extractor.extract(Path(filepath), bank_hint=file_type)
+        logger.info(f"Extracted {len(raw_transactions)} raw transactions")
+
+        # Transform
+        transformed = self.transformer.transform(raw_transactions, source_file=filename)
+
+        # Validate
+        valid, errors = self.validator.validate(transformed)
+        if errors:
+            logger.warning(f"Validation errors: {len(errors)}")
+
+        # Load
+        stats = self.loader.load(valid)
+
+        # Mark as processed
+        self.file_tracker.mark_processed(filename, file_type, len(valid))
 
         return stats
 
