@@ -38,6 +38,9 @@ export default function TransactionsPage() {
   // Available years
   const [years, setYears] = useState<number[]>([]);
 
+  // Labeling stats
+  const [labelingStats, setLabelingStats] = useState<api.LabelingStats | null>(null);
+
   useEffect(() => {
     loadInitialData();
   }, []);
@@ -48,14 +51,16 @@ export default function TransactionsPage() {
 
   const loadInitialData = async () => {
     try {
-      const [categoriesData, typesData, yearsData] = await Promise.all([
+      const [categoriesData, typesData, yearsData, statsData] = await Promise.all([
         api.getCategories(),
         api.getTypes(),
         api.getAvailableYears(),
+        api.getLabelingStats(),
       ]);
       setCategories(categoriesData);
       setTypes(typesData);
       setYears(yearsData);
+      setLabelingStats(statsData);
       if (yearsData.length > 0) {
         setFilterYear(yearsData[0]);
       }
@@ -129,6 +134,9 @@ export default function TransactionsPage() {
         )
       );
       setEditingId(null);
+      // Reload stats after editing
+      const statsData = await api.getLabelingStats();
+      setLabelingStats(statsData);
     } catch (error) {
       console.error('Failed to update transaction:', error);
       alert('Failed to update transaction');
@@ -194,6 +202,9 @@ export default function TransactionsPage() {
       await api.bulkUpdateTransactions(Array.from(selectedIds), updateValues);
       // Reload transactions to get updated data
       await loadTransactions();
+      // Reload labeling stats after bulk update
+      const statsData = await api.getLabelingStats();
+      setLabelingStats(statsData);
       setIsBulkEditMode(false);
       setSelectedIds(new Set());
       alert(`Successfully updated ${selectedIds.size} transactions`);
@@ -318,6 +329,41 @@ export default function TransactionsPage() {
           {uploading ? 'Processing...' : 'Upload & Process'}
         </Button>
       </Card>
+
+      {/* Labeling Status Info Box */}
+      {labelingStats && (
+        <div className={`rounded-lg border p-4 ${
+          labelingStats.unlabeled === 0
+            ? 'bg-green-50 border-green-200'
+            : 'bg-yellow-50 border-yellow-200'
+        }`}>
+          <div className="flex items-start justify-between">
+            <div className="flex-1">
+              <h3 className={`text-sm font-semibold mb-2 ${
+                labelingStats.unlabeled === 0 ? 'text-green-900' : 'text-yellow-900'
+              }`}>
+                {labelingStats.unlabeled === 0 ? '✓ All Transactions Labeled' : '⚠️ Transactions Need Labeling'}
+              </h3>
+              <div className="space-y-1 text-xs">
+                <p className={labelingStats.unlabeled === 0 ? 'text-green-800' : 'text-yellow-800'}>
+                  <strong>{labelingStats.labeled}</strong> of <strong>{labelingStats.total}</strong> transactions labeled
+                  ({labelingStats.percent_labeled}%)
+                </p>
+                {labelingStats.unlabeled > 0 && (
+                  <p className="text-yellow-800">
+                    <strong>{labelingStats.unlabeled}</strong> transactions missing type or category
+                  </p>
+                )}
+                {labelingStats.no_sub_type > 0 && (
+                  <p className={labelingStats.unlabeled === 0 ? 'text-green-800' : 'text-yellow-800'}>
+                    <strong>{labelingStats.no_sub_type}</strong> expenses without sub-type (Wants/Needs will be auto-assigned when categorized)
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Filters */}
       <Card className="border border-gray-200" shadow="sm" padding="sm">

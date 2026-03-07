@@ -113,6 +113,19 @@ export const deleteTransaction = async (id: number): Promise<void> => {
   await api.delete(`/transactions/${id}`);
 };
 
+export interface LabelingStats {
+  total: number;
+  labeled: number;
+  unlabeled: number;
+  no_sub_type: number;
+  percent_labeled: number;
+}
+
+export const getLabelingStats = async (): Promise<LabelingStats> => {
+  const { data } = await api.get('/transactions/stats/labeling');
+  return data;
+};
+
 // Upload
 export const uploadFiles = async (
   ubsFile?: File,

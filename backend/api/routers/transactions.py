@@ -17,9 +17,41 @@ router = APIRouter(prefix="/api/transactions", tags=["Transactions"])
 
 
 def auto_set_sub_type(category: str, sub_type: Optional[str]) -> Optional[str]:
-    """Auto-set sub_type to 'Essentials' for Housing and Health Insurance categories."""
-    if category in ["Housing", "Health Insurance"]:
+    """
+    Auto-set sub_type based on category.
+
+    Essentials: Fixed costs (Housing, Health, Tax)
+    Needs: Necessary but variable (Groceries, Utils, Transport)
+    Wants: Discretionary spending (Restaurants, Travel, Entertainment)
+    """
+    # If sub_type is already set, keep it
+    if sub_type:
+        return sub_type
+
+    # Essentials - Fixed mandatory costs
+    essentials = [
+        "Housing", "Health Insurance", "Health Other", "Tax"
+    ]
+
+    # Needs - Necessary but variable
+    needs = [
+        "Groceries", "Internet + Mobile", "Train", "Home Utils", "Car"
+    ]
+
+    # Wants - Discretionary spending
+    wants = [
+        "Restaurants", "Travel", "Wellbeing", "Sport", "Entertainment",
+        "Digital Goods", "Clothing", "Home Furnitures", "Extras"
+    ]
+
+    if category in essentials:
         return "Essentials"
+    elif category in needs:
+        return "Needs"
+    elif category in wants:
+        return "Wants"
+
+    # Default to None if category not recognized
     return sub_type
 
 
@@ -175,6 +207,49 @@ def delete_transaction(
     session.delete(transaction)
     session.commit()
     return {"message": "Transaction deleted"}
+
+
+@router.get("/stats/labeling")
+def get_labeling_stats(
+    current_user: dict = Depends(get_current_user),
+    session: Session = Depends(get_db)
+):
+    """Get statistics about transaction labeling status."""
+    from sqlalchemy import func, or_
+
+    # Total transactions
+    total = session.query(func.count(Transaction.id)).filter(
+        Transaction.user_id == current_user["id"]
+    ).scalar()
+
+    # Unlabeled transactions (missing type or category)
+    unlabeled = session.query(func.count(Transaction.id)).filter(
+        Transaction.user_id == current_user["id"],
+        or_(
+            Transaction.type.is_(None),
+            Transaction.type == "",
+            Transaction.category.is_(None),
+            Transaction.category == ""
+        )
+    ).scalar()
+
+    # Transactions without sub_type
+    no_sub_type = session.query(func.count(Transaction.id)).filter(
+        Transaction.user_id == current_user["id"],
+        Transaction.sub_type.is_(None),
+        Transaction.type == "Expenses"  # Only count Expenses
+    ).scalar()
+
+    labeled = total - unlabeled
+    percent_labeled = (labeled / total * 100) if total > 0 else 0
+
+    return {
+        "total": total,
+        "labeled": labeled,
+        "unlabeled": unlabeled,
+        "no_sub_type": no_sub_type,
+        "percent_labeled": round(percent_labeled, 1)
+    }
 
 
 @router.post("/bulk-update")
