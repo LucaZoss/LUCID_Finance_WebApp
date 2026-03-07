@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import {
   BarChart,
   Bar,
-  ComposedChart,
+  LineChart,
+  Line,
   PieChart,
   Pie,
   Cell,
@@ -428,7 +429,7 @@ export default function DashboardPage() {
           )}
         </h3>
         <ResponsiveContainer width="100%" height={350}>
-          <ComposedChart data={trendChartData}>
+          <LineChart data={trendChartData}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="month" />
             <YAxis tickFormatter={formatShortAmount} />
@@ -439,16 +440,67 @@ export default function DashboardPage() {
               }}
             />
             <Legend />
-            <Bar dataKey="Income" fill={CHART_COLORS.income} name="Income" />
-            <Bar dataKey="IncomeBudget" fill="#9ca3af" legendType="none" />
-            <Bar dataKey="Expenses" fill={CHART_COLORS.expenses} name="Expenses" />
-            <Bar dataKey="ExpensesBudget" fill="#9ca3af" legendType="none" />
-            <Bar dataKey="Savings" fill={CHART_COLORS.savings} name="Savings" />
-            <Bar dataKey="SavingsBudget" fill="#9ca3af" legendType="none" />
-          </ComposedChart>
+            {/* Income - solid green line */}
+            <Line
+              type="monotone"
+              dataKey="Income"
+              stroke="#22c55e"
+              strokeWidth={2}
+              dot={{ fill: '#22c55e', r: 4 }}
+              name="Income"
+            />
+            {/* Income Budget - dotted green line */}
+            <Line
+              type="monotone"
+              dataKey="IncomeBudget"
+              stroke="#22c55e"
+              strokeWidth={2}
+              strokeDasharray="5 5"
+              dot={{ fill: '#22c55e', r: 3 }}
+              name="Income Budget"
+            />
+            {/* Expenses - solid red line */}
+            <Line
+              type="monotone"
+              dataKey="Expenses"
+              stroke="#ef4444"
+              strokeWidth={2}
+              dot={{ fill: '#ef4444', r: 4 }}
+              name="Expenses"
+            />
+            {/* Expenses Budget - dotted red line */}
+            <Line
+              type="monotone"
+              dataKey="ExpensesBudget"
+              stroke="#ef4444"
+              strokeWidth={2}
+              strokeDasharray="5 5"
+              dot={{ fill: '#ef4444', r: 3 }}
+              name="Expenses Budget"
+            />
+            {/* Savings - solid blue line */}
+            <Line
+              type="monotone"
+              dataKey="Savings"
+              stroke="#3b82f6"
+              strokeWidth={2}
+              dot={{ fill: '#3b82f6', r: 4 }}
+              name="Savings"
+            />
+            {/* Savings Budget - dotted blue line */}
+            <Line
+              type="monotone"
+              dataKey="SavingsBudget"
+              stroke="#3b82f6"
+              strokeWidth={2}
+              strokeDasharray="5 5"
+              dot={{ fill: '#3b82f6', r: 3 }}
+              name="Savings Budget"
+            />
+          </LineChart>
         </ResponsiveContainer>
         <p className="text-xs text-gray-500 mt-2">
-          Colored bars show actual values, grey bars show budgeted values
+          Solid lines show actual values, dotted lines show budgeted values
         </p>
       </Card>
 
