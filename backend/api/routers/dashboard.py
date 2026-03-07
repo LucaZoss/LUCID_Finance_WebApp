@@ -53,15 +53,24 @@ def get_dashboard_summary(
             (BudgetPlan.month == month) | (BudgetPlan.month.is_(None))
         )
 
+        # Separate yearly and monthly budgets to ensure monthly takes precedence
         budgets = {}
+        yearly_budgets = {}
+        monthly_budgets = {}
+
         for b in budget_query.all():
             key = (b.type, b.category)
             if b.month is None:
-                # Yearly budget - divide by 12 for monthly view
-                budgets[key] = float(b.amount) / 12
+                yearly_budgets[key] = float(b.amount) / 12
             else:
-                # Monthly budget takes precedence
-                budgets[key] = float(b.amount)
+                monthly_budgets[key] = float(b.amount)
+
+        # Monthly budgets take precedence over yearly
+        for key in set(list(yearly_budgets.keys()) + list(monthly_budgets.keys())):
+            if key in monthly_budgets:
+                budgets[key] = monthly_budgets[key]
+            else:
+                budgets[key] = yearly_budgets[key]
     else:
         # For full year: sum all monthly budgets OR use yearly budget
         all_budgets = session.query(BudgetPlan).filter(
