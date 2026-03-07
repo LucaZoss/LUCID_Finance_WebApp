@@ -282,9 +282,38 @@ def apply_sub_types_to_existing(
     current_user: dict = Depends(get_current_user),
     session: Session = Depends(get_db)
 ):
-    """Apply auto sub-type classification to all existing transactions missing sub_type."""
-    # Find all transactions with type="Expenses", have a category, but no sub_type
-    transactions = session.query(Transaction).filter(
+    """
+    Apply auto sub-type classification to all existing transactions.
+    - Clears sub_types for CC_Refund transactions
+    - Clears sub_types for CC_Fees transactions
+    - Applies budget-based sub_types to Expense transactions
+    """
+    updated_count = 0
+
+    # Step 1: Clear sub_types for all CC_Refund transactions
+    cc_refund_transactions = session.query(Transaction).filter(
+        Transaction.user_id == current_user["id"],
+        Transaction.type == "CC_Refund",
+        Transaction.sub_type.isnot(None)
+    ).all()
+
+    for transaction in cc_refund_transactions:
+        transaction.sub_type = None
+        updated_count += 1
+
+    # Step 2: Clear sub_types for all CC_Fees transactions
+    cc_fees_transactions = session.query(Transaction).filter(
+        Transaction.user_id == current_user["id"],
+        Transaction.category.in_(["CC_Fees", "CC Fees", "Fees"]),
+        Transaction.sub_type.isnot(None)
+    ).all()
+
+    for transaction in cc_fees_transactions:
+        transaction.sub_type = None
+        updated_count += 1
+
+    # Step 3: Apply budget-based sub_types to Expense transactions without sub_type
+    expense_transactions = session.query(Transaction).filter(
         Transaction.user_id == current_user["id"],
         Transaction.type == "Expenses",
         Transaction.category.isnot(None),
@@ -292,8 +321,7 @@ def apply_sub_types_to_existing(
         Transaction.sub_type.is_(None)
     ).all()
 
-    updated_count = 0
-    for transaction in transactions:
+    for transaction in expense_transactions:
         new_sub_type = auto_set_sub_type(transaction.category, None, session, current_user["id"], transaction.type)
         if new_sub_type:
             transaction.sub_type = new_sub_type
