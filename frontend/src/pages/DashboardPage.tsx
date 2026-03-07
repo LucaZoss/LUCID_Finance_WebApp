@@ -430,7 +430,7 @@ export default function DashboardPage() {
         </h3>
         <ResponsiveContainer width="100%" height={350}>
           <LineChart data={trendChartData}>
-            <CartesianGrid strokeDasharray="3 3" />
+            <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.05)" />
             <XAxis dataKey="month" />
             <YAxis tickFormatter={formatShortAmount} />
             <Tooltip
@@ -449,7 +449,7 @@ export default function DashboardPage() {
               dot={{ fill: '#22c55e', r: 4 }}
               name="Income"
             />
-            {/* Income Budget - dotted green line */}
+            {/* Income Budget - dotted green line (hidden from legend) */}
             <Line
               type="monotone"
               dataKey="IncomeBudget"
@@ -457,7 +457,7 @@ export default function DashboardPage() {
               strokeWidth={2}
               strokeDasharray="5 5"
               dot={{ fill: '#22c55e', r: 3 }}
-              name="Income Budget"
+              legendType="none"
             />
             {/* Expenses - solid red line */}
             <Line
@@ -468,7 +468,7 @@ export default function DashboardPage() {
               dot={{ fill: '#ef4444', r: 4 }}
               name="Expenses"
             />
-            {/* Expenses Budget - dotted red line */}
+            {/* Expenses Budget - dotted red line (hidden from legend) */}
             <Line
               type="monotone"
               dataKey="ExpensesBudget"
@@ -476,7 +476,7 @@ export default function DashboardPage() {
               strokeWidth={2}
               strokeDasharray="5 5"
               dot={{ fill: '#ef4444', r: 3 }}
-              name="Expenses Budget"
+              legendType="none"
             />
             {/* Savings - solid blue line */}
             <Line
@@ -487,7 +487,7 @@ export default function DashboardPage() {
               dot={{ fill: '#3b82f6', r: 4 }}
               name="Savings"
             />
-            {/* Savings Budget - dotted blue line */}
+            {/* Savings Budget - dotted blue line (hidden from legend) */}
             <Line
               type="monotone"
               dataKey="SavingsBudget"
@@ -495,7 +495,7 @@ export default function DashboardPage() {
               strokeWidth={2}
               strokeDasharray="5 5"
               dot={{ fill: '#3b82f6', r: 3 }}
-              name="Savings Budget"
+              legendType="none"
             />
           </LineChart>
         </ResponsiveContainer>
