@@ -19,35 +19,51 @@ router = APIRouter(prefix="/api/transactions", tags=["Transactions"])
 def get_sub_type_from_budget(session: Session, user_id: int, category: str) -> Optional[str]:
     """
     Look up sub_type from user's budget for this category.
-    Returns the sub_type if found in any budget, None otherwise.
+    Returns the sub_type from the most recent budget, None otherwise.
     """
     from ...data_pipeline.models import BudgetPlan
 
+    # Get the most recent budget for this category (order by year DESC, then created_at DESC)
     budget = session.query(BudgetPlan).filter(
         BudgetPlan.user_id == user_id,
         BudgetPlan.category == category,
         BudgetPlan.sub_type.isnot(None)
+    ).order_by(
+        BudgetPlan.year.desc(),
+        BudgetPlan.created_at.desc()
     ).first()
 
     return budget.sub_type if budget else None
 
 
-def auto_set_sub_type(category: str, sub_type: Optional[str], session: Optional[Session] = None, user_id: Optional[int] = None) -> Optional[str]:
+def auto_set_sub_type(category: str, sub_type: Optional[str], session: Optional[Session] = None, user_id: Optional[int] = None, transaction_type: Optional[str] = None) -> Optional[str]:
     """
-    Auto-set sub_type based on category.
+    Auto-set sub_type based on category and transaction type.
 
-    Priority:
+    Special cases (always None):
+    - CC_Refund type: No sub_type (it's a refund, not a categorized expense)
+    - CC_Fees category: No sub_type (bank fees are special)
+
+    Priority for other cases:
     1. If sub_type is already set, keep it
     2. If user has a budget for this category, use its sub_type
     3. For Housing and Health Insurance, default to "Essentials" (fixed in Budget Wizard Step 2)
     4. Otherwise, leave as None (user should classify via Budget Wizard)
     """
+    # Special case: CC_Refund type should never have a sub_type
+    if transaction_type == "CC_Refund":
+        return None
+
+    # Special case: CC_Fees category should never have a sub_type
+    if category and category.lower() in ["cc_fees", "cc fees", "fees"]:
+        return None
+
     # If sub_type is already set, keep it
     if sub_type:
         return sub_type
 
     # Try to get sub_type from user's budget
-    if session and user_id:
+    if session and user_id and category:
         budget_sub_type = get_sub_type_from_budget(session, user_id, category)
         if budget_sub_type:
             return budget_sub_type
@@ -131,11 +147,13 @@ def update_transaction(
         transaction.type = update.type
     if update.category is not None:
         transaction.category = update.category
-        # Auto-set sub_type based on user's budget
-        transaction.sub_type = auto_set_sub_type(update.category, update.sub_type, session, current_user["id"])
+        # Auto-set sub_type based on user's budget (use updated type if set, else current)
+        current_type = update.type if update.type is not None else transaction.type
+        transaction.sub_type = auto_set_sub_type(update.category, update.sub_type, session, current_user["id"], current_type)
     elif update.sub_type is not None:
         # If only sub_type is being updated, apply auto-set logic
-        transaction.sub_type = auto_set_sub_type(transaction.category, update.sub_type, session, current_user["id"])
+        current_type = update.type if update.type is not None else transaction.type
+        transaction.sub_type = auto_set_sub_type(transaction.category, update.sub_type, session, current_user["id"], current_type)
 
     session.commit()
     session.refresh(transaction)
@@ -184,11 +202,13 @@ def bulk_update_transactions(
             transaction.type = bulk_update.type
         if bulk_update.category is not None:
             transaction.category = bulk_update.category
-            # Auto-set sub_type based on user's budget
-            transaction.sub_type = auto_set_sub_type(bulk_update.category, bulk_update.sub_type, session, current_user["id"])
+            # Auto-set sub_type based on user's budget (use updated type if set, else current)
+            current_type = bulk_update.type if bulk_update.type is not None else transaction.type
+            transaction.sub_type = auto_set_sub_type(bulk_update.category, bulk_update.sub_type, session, current_user["id"], current_type)
         elif bulk_update.sub_type is not None:
             # If only sub_type is being updated, apply auto-set logic
-            transaction.sub_type = auto_set_sub_type(transaction.category, bulk_update.sub_type, session, current_user["id"])
+            current_type = bulk_update.type if bulk_update.type is not None else transaction.type
+            transaction.sub_type = auto_set_sub_type(transaction.category, bulk_update.sub_type, session, current_user["id"], current_type)
         updated_count += 1
 
     session.commit()
@@ -274,7 +294,7 @@ def apply_sub_types_to_existing(
 
     updated_count = 0
     for transaction in transactions:
-        new_sub_type = auto_set_sub_type(transaction.category, None, session, current_user["id"])
+        new_sub_type = auto_set_sub_type(transaction.category, None, session, current_user["id"], transaction.type)
         if new_sub_type:
             transaction.sub_type = new_sub_type
             updated_count += 1
