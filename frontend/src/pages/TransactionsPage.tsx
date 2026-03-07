@@ -93,16 +93,18 @@ export default function TransactionsPage() {
     setUploading(true);
     try {
       const result = await api.uploadFiles(ubsFile || undefined, ccFile || undefined);
-      alert(`Upload successful! ${JSON.stringify(result.stats)}`);
+      const stats = result.stats as any;
+      alert(`Upload successful!\n\nInserted: ${stats.inserted} transactions\nSkipped: ${stats.skipped} (duplicates)\nErrors: ${stats.errors}`);
       setUbsFile(null);
       setCcFile(null);
       if (ubsFileRef.current) ubsFileRef.current.value = '';
       if (ccFileRef.current) ccFileRef.current.value = '';
       await loadInitialData();
       await loadTransactions();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Upload failed:', error);
-      alert('Upload failed. Please check the file format.');
+      const errorMessage = error.response?.data?.detail || 'Upload failed. Please check the file format and naming.';
+      alert(errorMessage);
     } finally {
       setUploading(false);
     }
@@ -296,6 +298,14 @@ export default function TransactionsPage() {
               <p className="mt-1 text-sm text-green-600">Selected: {ccFile.name}</p>
             )}
           </div>
+        </div>
+
+        <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-3">
+          <p className="text-xs font-semibold text-blue-900 mb-1">📋 File Naming Requirements:</p>
+          <ul className="text-xs text-blue-800 space-y-0.5">
+            <li>• <strong>Bank account files:</strong> bank_name.csv (e.g., ubs.csv, bcv.csv, raiffeisen.csv)</li>
+            <li>• <strong>Credit card files:</strong> cc.csv</li>
+          </ul>
         </div>
 
         <Button

@@ -215,6 +215,40 @@ def bulk_update_by_criteria(
     return {"message": f"Updated {count} transactions"}
 
 
+def validate_filename(filename: str) -> tuple[bool, str]:
+    """
+    Validate CSV filename format.
+
+    Bank account files should be named: bank_name.csv (e.g., ubs.csv, bcv.csv)
+    Credit card files should be named: cc.csv
+
+    Returns: (is_valid, error_message)
+    """
+    filename_lower = filename.lower()
+
+    # Check if it's a CSV file
+    if not filename_lower.endswith('.csv'):
+        return False, "File must be a CSV file (.csv extension)"
+
+    # Check for valid naming patterns
+    valid_patterns = ['ubs', 'bcv', 'cc', 'raiffeisen', 'postfinance', 'credit-suisse', 'zkb']
+
+    # Extract base name without extension
+    base_name = filename_lower[:-4]  # Remove .csv
+
+    # Check if filename contains any valid bank identifier
+    has_valid_pattern = any(pattern in base_name for pattern in valid_patterns)
+
+    if not has_valid_pattern:
+        return False, (
+            "Invalid filename format. Please name your files:\n"
+            "• Bank account: bank_name.csv (e.g., ubs.csv, bcv.csv, raiffeisen.csv)\n"
+            "• Credit card: cc.csv"
+        )
+
+    return True, ""
+
+
 @router.post("/upload")
 async def upload_csv(
     request: Request,
@@ -225,6 +259,17 @@ async def upload_csv(
     """Upload bank CSV files for processing (UBS, CC, BCV, or any bank format)."""
     if not ubs_file and not cc_file:
         raise HTTPException(status_code=400, detail="At least one file must be provided")
+
+    # Validate filenames
+    if ubs_file:
+        is_valid, error_msg = validate_filename(ubs_file.filename)
+        if not is_valid:
+            raise HTTPException(status_code=400, detail=f"Bank account file: {error_msg}")
+
+    if cc_file:
+        is_valid, error_msg = validate_filename(cc_file.filename)
+        if not is_valid:
+            raise HTTPException(status_code=400, detail=f"Credit card file: {error_msg}")
 
     # Create temp directory for uploads
     upload_dir = Path("temp_uploads")
