@@ -155,6 +155,24 @@ export default function TransactionsPage() {
     }
   };
 
+  const handleApplySubTypes = async () => {
+    if (!confirm(`This will automatically assign sub-types (Essentials/Needs/Wants) to ${labelingStats?.no_sub_type} transactions based on their categories. Continue?`)) {
+      return;
+    }
+
+    try {
+      const result = await api.applySubTypes();
+      alert(result.message);
+      // Reload transactions and stats
+      await loadTransactions();
+      const statsData = await api.getLabelingStats();
+      setLabelingStats(statsData);
+    } catch (error) {
+      console.error('Failed to apply sub-types:', error);
+      alert('Failed to apply sub-types');
+    }
+  };
+
   const toggleSelect = (id: number) => {
     const newSelected = new Set(selectedIds);
     if (newSelected.has(id)) {
@@ -361,6 +379,16 @@ export default function TransactionsPage() {
                 )}
               </div>
             </div>
+            {labelingStats.no_sub_type > 0 && (
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={handleApplySubTypes}
+                className="ml-4"
+              >
+                Apply Sub-Types Now
+              </Button>
+            )}
           </div>
         </div>
       )}

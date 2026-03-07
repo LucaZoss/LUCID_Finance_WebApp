@@ -126,6 +126,11 @@ export const getLabelingStats = async (): Promise<LabelingStats> => {
   return data;
 };
 
+export const applySubTypes = async (): Promise<{ message: string; updated_count: number }> => {
+  const { data } = await api.post('/transactions/apply-sub-types');
+  return data;
+};
+
 // Upload
 export const uploadFiles = async (
   ubsFile?: File,

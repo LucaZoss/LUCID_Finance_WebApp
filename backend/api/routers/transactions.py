@@ -252,6 +252,35 @@ def get_labeling_stats(
     }
 
 
+@router.post("/apply-sub-types")
+def apply_sub_types_to_existing(
+    current_user: dict = Depends(get_current_user),
+    session: Session = Depends(get_db)
+):
+    """Apply auto sub-type classification to all existing transactions missing sub_type."""
+    # Find all transactions with type="Expenses", have a category, but no sub_type
+    transactions = session.query(Transaction).filter(
+        Transaction.user_id == current_user["id"],
+        Transaction.type == "Expenses",
+        Transaction.category.isnot(None),
+        Transaction.category != "",
+        Transaction.sub_type.is_(None)
+    ).all()
+
+    updated_count = 0
+    for transaction in transactions:
+        new_sub_type = auto_set_sub_type(transaction.category, None)
+        if new_sub_type:
+            transaction.sub_type = new_sub_type
+            updated_count += 1
+
+    session.commit()
+    return {
+        "message": f"Applied sub-types to {updated_count} transactions",
+        "updated_count": updated_count
+    }
+
+
 @router.post("/bulk-update")
 def bulk_update_by_criteria(
     updates: dict,
