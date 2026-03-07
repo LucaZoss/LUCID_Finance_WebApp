@@ -108,8 +108,30 @@ def delete_user(
                 detail="Cannot delete the last admin user"
             )
 
+    # Delete all user's data (cascade delete)
+    from ...data_pipeline.models import Transaction, BudgetPlan, Category, ProcessedFile, CategorizationRule
+
+    # Count records before deletion for reporting
+    transactions_count = session.query(Transaction).filter(Transaction.user_id == user_id).count()
+    budgets_count = session.query(BudgetPlan).filter(BudgetPlan.user_id == user_id).count()
+    categories_count = session.query(Category).filter(Category.user_id == user_id).count()
+
+    # Delete in order (to avoid foreign key issues)
+    session.query(Transaction).filter(Transaction.user_id == user_id).delete()
+    session.query(BudgetPlan).filter(BudgetPlan.user_id == user_id).delete()
+    session.query(Category).filter(Category.user_id == user_id).delete()
+    session.query(ProcessedFile).filter(ProcessedFile.user_id == user_id).delete()
+    session.query(CategorizationRule).filter(CategorizationRule.user_id == user_id).delete()
+
     # Delete the user
     session.delete(user)
     session.commit()
 
-    return {"message": f"User '{user.username}' deleted successfully"}
+    return {
+        "message": f"User '{user.username}' deleted successfully",
+        "deleted": {
+            "transactions": transactions_count,
+            "budgets": budgets_count,
+            "categories": categories_count
+        }
+    }
