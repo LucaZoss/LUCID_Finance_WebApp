@@ -76,6 +76,20 @@ def auto_set_sub_type(category: str, sub_type: Optional[str], session: Optional[
     return None
 
 
+def auto_set_category_for_type(transaction_type: str, category: Optional[str]) -> Optional[str]:
+    """
+    Auto-set category based on transaction type.
+
+    Special cases:
+    - CC_Refund type: Always set category to "Card Refund"
+    """
+    if transaction_type == "CC_Refund":
+        return "Card Refund"
+
+    # For all other types, keep the existing category
+    return category
+
+
 @router.get("", response_model=List[TransactionResponse])
 def get_transactions(
     year: Optional[int] = None,
@@ -143,17 +157,23 @@ def update_transaction(
     if not transaction:
         raise HTTPException(status_code=404, detail="Transaction not found")
 
+    # Update type first
     if update.type is not None:
         transaction.type = update.type
+        # Auto-set category based on type (e.g., CC_Refund -> "Card Refund")
+        current_type = update.type
+        transaction.category = auto_set_category_for_type(current_type, transaction.category)
+
+    # Update category
     if update.category is not None:
         transaction.category = update.category
-        # Auto-set sub_type based on user's budget (use updated type if set, else current)
-        current_type = update.type if update.type is not None else transaction.type
-        transaction.sub_type = auto_set_sub_type(update.category, update.sub_type, session, current_user["id"], current_type)
-    elif update.sub_type is not None:
-        # If only sub_type is being updated, apply auto-set logic
-        current_type = update.type if update.type is not None else transaction.type
-        transaction.sub_type = auto_set_sub_type(transaction.category, update.sub_type, session, current_user["id"], current_type)
+
+    # Auto-set sub_type based on final type and category
+    current_type = update.type if update.type is not None else transaction.type
+    current_category = transaction.category
+
+    if update.category is not None or update.sub_type is not None or update.type is not None:
+        transaction.sub_type = auto_set_sub_type(current_category, update.sub_type, session, current_user["id"], current_type)
 
     session.commit()
     session.refresh(transaction)
@@ -198,17 +218,23 @@ def bulk_update_transactions(
     # Update all transactions
     updated_count = 0
     for transaction in transactions:
+        # Update type first
         if bulk_update.type is not None:
             transaction.type = bulk_update.type
+            # Auto-set category based on type (e.g., CC_Refund -> "Card Refund")
+            transaction.category = auto_set_category_for_type(bulk_update.type, transaction.category)
+
+        # Update category
         if bulk_update.category is not None:
             transaction.category = bulk_update.category
-            # Auto-set sub_type based on user's budget (use updated type if set, else current)
-            current_type = bulk_update.type if bulk_update.type is not None else transaction.type
-            transaction.sub_type = auto_set_sub_type(bulk_update.category, bulk_update.sub_type, session, current_user["id"], current_type)
-        elif bulk_update.sub_type is not None:
-            # If only sub_type is being updated, apply auto-set logic
-            current_type = bulk_update.type if bulk_update.type is not None else transaction.type
-            transaction.sub_type = auto_set_sub_type(transaction.category, bulk_update.sub_type, session, current_user["id"], current_type)
+
+        # Auto-set sub_type based on final type and category
+        current_type = bulk_update.type if bulk_update.type is not None else transaction.type
+        current_category = transaction.category
+
+        if bulk_update.category is not None or bulk_update.sub_type is not None or bulk_update.type is not None:
+            transaction.sub_type = auto_set_sub_type(current_category, bulk_update.sub_type, session, current_user["id"], current_type)
+
         updated_count += 1
 
     session.commit()
@@ -284,22 +310,27 @@ def apply_sub_types_to_existing(
 ):
     """
     Apply auto sub-type classification to all existing transactions.
-    - Clears sub_types for CC_Refund transactions
+    - Sets category to "Card Refund" and clears sub_types for CC_Refund transactions
     - Clears sub_types for CC_Fees transactions
     - Applies budget-based sub_types to Expense transactions
     """
     updated_count = 0
 
-    # Step 1: Clear sub_types for all CC_Refund transactions
+    # Step 1: Fix all CC_Refund transactions (set category and clear sub_type)
     cc_refund_transactions = session.query(Transaction).filter(
         Transaction.user_id == current_user["id"],
-        Transaction.type == "CC_Refund",
-        Transaction.sub_type.isnot(None)
+        Transaction.type == "CC_Refund"
     ).all()
 
     for transaction in cc_refund_transactions:
-        transaction.sub_type = None
-        updated_count += 1
+        # Set category to "Card Refund"
+        if transaction.category != "Card Refund":
+            transaction.category = "Card Refund"
+            updated_count += 1
+        # Clear sub_type
+        if transaction.sub_type is not None:
+            transaction.sub_type = None
+            updated_count += 1
 
     # Step 2: Clear sub_types for all CC_Fees transactions
     cc_fees_transactions = session.query(Transaction).filter(
