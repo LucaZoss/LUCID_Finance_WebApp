@@ -60,6 +60,8 @@ def create_budget(
         )
         session.add(existing)
 
+    # Flush to database before auto-populate queries to prevent autoflush conflicts
+    session.flush()
     session.commit()
     session.refresh(existing)
 
@@ -91,6 +93,8 @@ def create_budget(
                         amount=monthly_amount,
                     )
                     session.add(monthly_budget)
+                # Flush after each addition to prevent autoflush conflicts in subsequent queries
+                session.flush()
         else:
             # Monthly budget entered → update yearly budget (sum all months)
             all_monthly = session.query(BudgetPlan).filter(
@@ -126,6 +130,7 @@ def create_budget(
                         amount=yearly_total,
                     )
                     session.add(yearly_budget)
+                session.flush()
 
         session.commit()
 
