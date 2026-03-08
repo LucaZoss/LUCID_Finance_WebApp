@@ -32,6 +32,15 @@ class TransactionUpdate(BaseModel):
     sub_type: Optional[str] = None
 
 
+class TransactionCreate(BaseModel):
+    date: date
+    type: str
+    category: str
+    sub_type: Optional[str] = None
+    amount: float
+    description: Optional[str] = None
+
+
 class BulkTransactionUpdate(BaseModel):
     transaction_ids: List[int]
     type: Optional[str] = None

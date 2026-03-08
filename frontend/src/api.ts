@@ -90,6 +90,18 @@ export const getTransactions = async (params?: {
   return data;
 };
 
+export const createTransaction = async (transaction: {
+  date: string;
+  type: string;
+  category: string;
+  sub_type?: string | null;
+  amount: number;
+  description?: string;
+}): Promise<Transaction> => {
+  const { data } = await api.post('/transactions', transaction);
+  return data;
+};
+
 export const updateTransaction = async (
   id: number,
   update: { type?: string; category?: string }

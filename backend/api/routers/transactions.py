@@ -9,9 +9,11 @@ from pathlib import Path
 import shutil
 
 from ..dependencies import get_db, get_current_user
-from ..schemas import TransactionResponse, TransactionUpdate, BulkTransactionUpdate
+from ..schemas import TransactionResponse, TransactionUpdate, TransactionCreate, BulkTransactionUpdate
 from ...data_pipeline.models import Transaction
 from ...data_pipeline.pipeline import TransactionPipeline
+from decimal import Decimal
+from datetime import datetime
 
 router = APIRouter(prefix="/api/transactions", tags=["Transactions"])
 
@@ -124,6 +126,48 @@ def get_transactions(
     transactions = query.offset(offset).limit(limit).all()
 
     return [TransactionResponse.model_validate(t) for t in transactions]
+
+
+@router.post("", response_model=TransactionResponse)
+def create_transaction(
+    transaction: TransactionCreate,
+    current_user: dict = Depends(get_current_user),
+    session: Session = Depends(get_db)
+):
+    """Create a new manual transaction."""
+    # Auto-set category for CC_Refund type
+    category = auto_set_category_for_type(transaction.type, transaction.category)
+
+    # Auto-set sub_type based on budget and type
+    sub_type = auto_set_sub_type(
+        category,
+        transaction.sub_type,
+        session,
+        current_user["id"],
+        transaction.type
+    )
+
+    # Create new transaction
+    new_transaction = Transaction(
+        user_id=current_user["id"],
+        date=transaction.date,
+        type=transaction.type,
+        category=category,
+        sub_type=sub_type,
+        amount=Decimal(str(abs(transaction.amount))),  # Ensure positive
+        description=transaction.description or "",
+        source="Manual",
+        month=transaction.date.month,
+        year=transaction.date.year,
+        source_file=None,
+        created_at=datetime.utcnow()
+    )
+
+    session.add(new_transaction)
+    session.commit()
+    session.refresh(new_transaction)
+
+    return TransactionResponse.model_validate(new_transaction)
 
 
 @router.get("/{transaction_id}", response_model=TransactionResponse)

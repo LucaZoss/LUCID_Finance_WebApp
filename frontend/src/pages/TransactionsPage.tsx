@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Upload, Search, Edit2, Check, X, Trash2, RefreshCw } from 'lucide-react';
+import { Upload, Search, Edit2, Check, X, Trash2, RefreshCw, Plus } from 'lucide-react';
 import type { Transaction, CategoryInfo } from '../types';
 import * as api from '../api';
 import { formatAmount } from '../utils/formatters';
@@ -40,6 +40,18 @@ export default function TransactionsPage() {
 
   // Labeling stats
   const [labelingStats, setLabelingStats] = useState<api.LabelingStats | null>(null);
+
+  // Add transaction
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newTransaction, setNewTransaction] = useState({
+    date: new Date().toISOString().split('T')[0],
+    type: 'Expenses',
+    category: '',
+    sub_type: '',
+    amount: 0,
+    description: '',
+  });
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     loadInitialData();
@@ -170,6 +182,45 @@ export default function TransactionsPage() {
     } catch (error) {
       console.error('Failed to apply sub-types:', error);
       alert('Failed to apply sub-types');
+    }
+  };
+
+  const handleAddTransaction = async () => {
+    if (!newTransaction.category || newTransaction.amount <= 0) {
+      alert('Please fill in all required fields (Category and Amount must be greater than 0)');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await api.createTransaction({
+        date: newTransaction.date,
+        type: newTransaction.type,
+        category: newTransaction.category,
+        sub_type: newTransaction.sub_type || null,
+        amount: newTransaction.amount,
+        description: newTransaction.description,
+      });
+
+      setShowAddForm(false);
+      setNewTransaction({
+        date: new Date().toISOString().split('T')[0],
+        type: 'Expenses',
+        category: '',
+        sub_type: '',
+        amount: 0,
+        description: '',
+      });
+      await loadTransactions();
+      const statsData = await api.getLabelingStats();
+      setLabelingStats(statsData);
+      alert('Transaction added successfully!');
+    } catch (error: any) {
+      console.error('Failed to add transaction:', error);
+      const errorMessage = error?.response?.data?.detail || error?.message || 'Unknown error';
+      alert(`Failed to add transaction: ${errorMessage}`);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -337,16 +388,118 @@ export default function TransactionsPage() {
           </ul>
         </div>
 
-        <Button
-          onClick={handleUpload}
-          disabled={(!ubsFile && !ccFile)}
-          isLoading={uploading}
-          className="mt-4 flex items-center"
-        >
-          {!uploading && <Upload className="w-4 h-4 mr-2" />}
-          {uploading ? 'Processing...' : 'Upload & Process'}
-        </Button>
+        <div className="flex gap-3 mt-4">
+          <Button
+            onClick={handleUpload}
+            disabled={(!ubsFile && !ccFile)}
+            isLoading={uploading}
+            className="flex items-center"
+          >
+            {!uploading && <Upload className="w-4 h-4 mr-2" />}
+            {uploading ? 'Processing...' : 'Upload & Process'}
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => setShowAddForm(true)}
+            className="flex items-center"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Add Transaction Manually
+          </Button>
+        </div>
       </Card>
+
+      {/* Add Transaction Form Modal */}
+      {showAddForm && (
+        <Card className="border-2 border-blue-500 shadow-lg">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-gray-900">Add New Transaction</h3>
+            <button
+              onClick={() => setShowAddForm(false)}
+              className="text-gray-400 hover:text-gray-600"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <Input
+              label="Date *"
+              type="date"
+              value={newTransaction.date}
+              onChange={(e) => setNewTransaction({ ...newTransaction, date: e.target.value })}
+            />
+
+            <Select
+              label="Type *"
+              value={newTransaction.type}
+              onChange={(e) => setNewTransaction({ ...newTransaction, type: e.target.value, category: '' })}
+              options={[
+                { value: 'Income', label: 'Income' },
+                { value: 'Expenses', label: 'Expenses' },
+                { value: 'Savings', label: 'Savings' },
+              ]}
+            />
+
+            <Select
+              label="Category *"
+              value={newTransaction.category}
+              onChange={(e) => setNewTransaction({ ...newTransaction, category: e.target.value })}
+              options={[
+                { value: '', label: '-- Select Category --' },
+                ...categories
+                  .find((c) => c.type === newTransaction.type)
+                  ?.categories.map((cat) => ({ value: cat, label: cat })) || [],
+              ]}
+            />
+
+            <Select
+              label="Sub-Type"
+              value={newTransaction.sub_type}
+              onChange={(e) => setNewTransaction({ ...newTransaction, sub_type: e.target.value })}
+              options={[
+                { value: '', label: 'Auto (from budget)' },
+                { value: 'Essentials', label: 'Essentials' },
+                { value: 'Needs', label: 'Needs' },
+                { value: 'Wants', label: 'Wants' },
+              ]}
+            />
+
+            <Input
+              label="Amount (CHF) *"
+              type="number"
+              step="0.01"
+              min="0"
+              value={newTransaction.amount || ''}
+              onChange={(e) => setNewTransaction({ ...newTransaction, amount: parseFloat(e.target.value) || 0 })}
+            />
+
+            <Input
+              label="Description"
+              value={newTransaction.description}
+              onChange={(e) => setNewTransaction({ ...newTransaction, description: e.target.value })}
+              placeholder="Optional description"
+            />
+          </div>
+
+          <div className="flex gap-3 mt-6">
+            <Button
+              onClick={handleAddTransaction}
+              isLoading={saving}
+              disabled={!newTransaction.category || newTransaction.amount <= 0}
+            >
+              {saving ? 'Adding...' : 'Add Transaction'}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setShowAddForm(false)}
+              disabled={saving}
+            >
+              Cancel
+            </Button>
+          </div>
+        </Card>
+      )}
 
       {/* Labeling Status Info Box */}
       {labelingStats && (
