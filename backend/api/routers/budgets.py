@@ -85,6 +85,7 @@ def create_budget(
     session.refresh(existing)
 
     # Auto-populate monthly budgets from yearly (or vice versa)
+    print(f"DEBUG: auto_populate={auto_populate}, budget.month={budget.month}")
     if auto_populate:
         if budget.month is None:
             # Yearly budget entered → create/update 12 monthly budgets
