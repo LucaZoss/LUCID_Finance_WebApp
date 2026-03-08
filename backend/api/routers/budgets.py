@@ -6,6 +6,7 @@ from typing import List, Optional
 from decimal import Decimal
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 
 from ..dependencies import get_db, get_current_user
 from ..schemas import BudgetPlanResponse, BudgetPlanCreate
@@ -61,8 +62,26 @@ def create_budget(
         session.add(existing)
 
     # Flush to database before auto-populate queries to prevent autoflush conflicts
-    session.flush()
-    session.commit()
+    try:
+        session.flush()
+        session.commit()
+    except IntegrityError:
+        # Budget already exists from a previous failed attempt, rollback and update instead
+        session.rollback()
+        existing = session.query(BudgetPlan).filter(
+            BudgetPlan.user_id == current_user["id"],
+            BudgetPlan.type == budget.type,
+            BudgetPlan.category == budget.category,
+            BudgetPlan.year == budget.year,
+            BudgetPlan.month == budget.month,
+        ).first()
+        if existing:
+            existing.amount = Decimal(str(budget.amount))
+            existing.sub_type = budget.sub_type
+            session.commit()
+        else:
+            raise  # Re-raise if we still can't find it
+
     session.refresh(existing)
 
     # Auto-populate monthly budgets from yearly (or vice versa)
@@ -94,7 +113,22 @@ def create_budget(
                     )
                     session.add(monthly_budget)
                 # Flush after each addition to prevent autoflush conflicts in subsequent queries
-                session.flush()
+                try:
+                    session.flush()
+                except IntegrityError:
+                    # Budget already exists, rollback and update instead
+                    session.rollback()
+                    monthly_budget = session.query(BudgetPlan).filter(
+                        BudgetPlan.user_id == current_user["id"],
+                        BudgetPlan.type == budget.type,
+                        BudgetPlan.category == budget.category,
+                        BudgetPlan.year == budget.year,
+                        BudgetPlan.month == month_num,
+                    ).first()
+                    if monthly_budget:
+                        monthly_budget.amount = monthly_amount
+                        monthly_budget.sub_type = budget.sub_type
+                        session.flush()
         else:
             # Monthly budget entered → update yearly budget (sum all months)
             all_monthly = session.query(BudgetPlan).filter(
@@ -130,7 +164,22 @@ def create_budget(
                         amount=yearly_total,
                     )
                     session.add(yearly_budget)
-                session.flush()
+                try:
+                    session.flush()
+                except IntegrityError:
+                    # Budget already exists, rollback and update instead
+                    session.rollback()
+                    yearly_budget = session.query(BudgetPlan).filter(
+                        BudgetPlan.user_id == current_user["id"],
+                        BudgetPlan.type == budget.type,
+                        BudgetPlan.category == budget.category,
+                        BudgetPlan.year == budget.year,
+                        BudgetPlan.month.is_(None),
+                    ).first()
+                    if yearly_budget:
+                        yearly_budget.amount = yearly_total
+                        yearly_budget.sub_type = budget.sub_type
+                        session.flush()
 
         session.commit()
 
