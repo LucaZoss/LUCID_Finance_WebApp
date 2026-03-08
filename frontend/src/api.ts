@@ -159,8 +159,8 @@ export const createBudget = async (budget: {
   year: number;
   month?: number | null;
   amount: number;
-}): Promise<BudgetPlan> => {
-  const { data } = await api.post('/budgets', budget);
+}, auto_populate: boolean = true): Promise<BudgetPlan> => {
+  const { data } = await api.post('/budgets', budget, { params: { auto_populate } });
   return data;
 };
 

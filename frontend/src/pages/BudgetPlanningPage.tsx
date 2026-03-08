@@ -245,7 +245,7 @@ export default function BudgetPlanningPage() {
     setSaving(true);
     try {
       if (newBudget.isMonthly) {
-        // Create monthly budgets for all 12 months
+        // Create monthly budgets for all 12 months (disable auto-populate to avoid duplicates)
         for (let month = 1; month <= 12; month++) {
           await api.createBudget({
             type: newBudget.type,
@@ -254,10 +254,19 @@ export default function BudgetPlanningPage() {
             year: selectedYear,
             month,
             amount: newBudget.amount,
-          });
+          }, false); // Disable auto-populate when creating multiple monthly budgets
         }
+        // After all 12 months are created, create/update the yearly total
+        await api.createBudget({
+          type: newBudget.type,
+          category: newBudget.category,
+          sub_type: newBudget.sub_type,
+          year: selectedYear,
+          month: null,
+          amount: newBudget.amount * 12,
+        }, false); // Create yearly budget manually
       } else {
-        // Create yearly budget
+        // Create yearly budget (with auto-populate to create 12 monthly budgets)
         await api.createBudget({
           type: newBudget.type,
           category: newBudget.category,
@@ -265,7 +274,7 @@ export default function BudgetPlanningPage() {
           year: selectedYear,
           month: null,
           amount: newBudget.amount,
-        });
+        }, true); // Enable auto-populate for yearly budget
       }
 
       setShowAddForm(false);
