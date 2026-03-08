@@ -271,9 +271,10 @@ export default function BudgetPlanningPage() {
       setShowAddForm(false);
       setNewBudget({ type: 'Expenses', category: '', sub_type: null, amount: 0, isMonthly: false });
       await loadBudgets();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to add budget:', error);
-      alert('Failed to add budget');
+      const errorMessage = error?.response?.data?.detail || error?.message || 'Unknown error';
+      alert(`Failed to add budget: ${errorMessage}`);
     } finally {
       setSaving(false);
     }
