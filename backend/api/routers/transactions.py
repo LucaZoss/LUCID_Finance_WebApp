@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, File, UploadFile, 
 from sqlalchemy.orm import Session
 from pathlib import Path
 import shutil
+import hashlib
 
 from ..dependencies import get_db, get_current_user
 from ..schemas import TransactionResponse, TransactionUpdate, TransactionCreate, BulkTransactionUpdate
@@ -92,6 +93,26 @@ def auto_set_category_for_type(transaction_type: str, category: Optional[str]) -
     return category
 
 
+def generate_manual_transaction_hash(date, amount: float, description: str, transaction_type: str, category: str) -> str:
+    """
+    Generate a unique hash for manual transactions.
+
+    Similar to the hash generation in data_pipeline/transformers.py but adapted for manual entry.
+    Hash is based on: date, amount, source (Manual), type, category, and description.
+    """
+    hash_parts = [
+        date.strftime("%Y-%m-%d"),
+        f"{amount:.2f}",
+        "Manual",  # source
+        transaction_type,
+        category or "",
+        (description or "")[:50],  # First 50 chars of description
+    ]
+
+    hash_string = "|".join(hash_parts)
+    return hashlib.sha256(hash_string.encode()).hexdigest()
+
+
 @router.get("", response_model=List[TransactionResponse])
 def get_transactions(
     year: Optional[int] = None,
@@ -147,6 +168,15 @@ def create_transaction(
         transaction.type
     )
 
+    # Generate transaction hash for deduplication
+    transaction_hash = generate_manual_transaction_hash(
+        date=transaction.date,
+        amount=abs(transaction.amount),
+        description=transaction.description or "",
+        transaction_type=transaction.type,
+        category=category
+    )
+
     # Create new transaction
     new_transaction = Transaction(
         user_id=current_user["id"],
@@ -160,6 +190,7 @@ def create_transaction(
         month=transaction.date.month,
         year=transaction.date.year,
         source_file=None,
+        transaction_hash=transaction_hash,
         created_at=datetime.utcnow()
     )
 
