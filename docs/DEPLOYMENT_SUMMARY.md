@@ -71,9 +71,9 @@ sudo systemctl enable cloudflared
 | File | Purpose |
 |------|---------|
 | `deploy_to_pi.sh` | Main deployment script - handles code deployment, dependency installation, and optional database migration |
-| `scripts/backup_database.sh` | Create database backup (MySQL dump) |
-| `scripts/restore_database.sh` | Restore database from backup |
-| `scripts/transfer_database.sh` | Backup local DB and transfer to Pi |
+| `ops/backup_database.sh` | Create database backup (MySQL dump) |
+| `ops/restore_database.sh` | Restore database from backup |
+| `ops/transfer_database.sh` | Backup local DB and transfer to Pi |
 
 ### Documentation
 
@@ -128,7 +128,7 @@ See [docs/PRODUCTION_ENV.md](docs/PRODUCTION_ENV.md) for detailed security setup
 ### Setup Backups
 - [ ] Create backup script on Pi: `~/backup_lucid.sh`
 - [ ] Add to crontab for daily backups
-- [ ] Test backup: `./scripts/backup_database.sh`
+- [ ] Test backup: `./ops/backup_database.sh`
 
 ### Testing
 - [ ] Login works with your credentials
@@ -149,10 +149,10 @@ See [docs/PRODUCTION_ENV.md](docs/PRODUCTION_ENV.md) for detailed security setup
 ./deploy_to_pi.sh
 
 # Transfer database only
-./scripts/transfer_database.sh
+./ops/transfer_database.sh
 
 # Backup local database
-./scripts/backup_database.sh
+./ops/backup_database.sh
 ```
 
 ### Service Management
@@ -185,7 +185,7 @@ ssh luca@lucid-pi.local 'htop'
 ### Database Operations
 ```bash
 # Backup on Pi
-ssh luca@lucid-pi.local 'cd ~/LUCID_Finance_WebApp && ./scripts/backup_database.sh'
+ssh luca@lucid-pi.local 'cd ~/LUCID_Finance_WebApp && ./ops/backup_database.sh'
 
 # Access database
 ssh luca@lucid-pi.local 'docker exec -it lucid_finance_db mysql -ulucid_user -p lucid_finance'
@@ -214,7 +214,7 @@ For complete instructions, see:
 ssh luca@lucid-pi.local 'docker exec -it lucid_finance_db mysql -ulucid_user -p -e "USE lucid_finance; SELECT COUNT(*) FROM transactions;"'
 
 # If empty, transfer again
-./scripts/transfer_database.sh
+./ops/transfer_database.sh
 ```
 
 ### Can't access lucid-finance.cc?

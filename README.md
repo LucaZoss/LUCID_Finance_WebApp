@@ -82,7 +82,7 @@ LUCID_Finance_WebApp/
 │   ├── backend/              # Backend API tests
 │   ├── test_*.py             # Pipeline & integration tests
 │   └── README.md
-├── scripts/                   # Utility scripts
+├── ops/                   # Utility scripts
 │   ├── create_admin.py       # Admin user creation
 │   └── migrate_*.py          # Database migrations
 ├── docs/                      # Documentation

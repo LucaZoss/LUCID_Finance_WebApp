@@ -263,7 +263,7 @@ docker compose up -d
 Wait 5 seconds, then restore your data:
 ```bash
 # If you have a backup
-./scripts/restore_database.sh <your-backup-file>
+./ops/restore_database.sh <your-backup-file>
 ```
 
 Restart backend:
@@ -277,7 +277,7 @@ If you transferred your database, you're done. Otherwise:
 
 ```bash
 cd ~/LUCID_Finance_WebApp
-uv run python scripts/create_admin.py
+uv run python ops/create_admin.py
 ```
 
 Follow prompts to create your admin user.
@@ -324,7 +324,7 @@ Add:
 ```bash
 #!/bin/bash
 cd /home/luca/LUCID_Finance_WebApp
-./scripts/backup_database.sh ~/backups/lucid_backup_$(date +%Y%m%d).sql
+./ops/backup_database.sh ~/backups/lucid_backup_$(date +%Y%m%d).sql
 
 # Keep only last 7 days
 find ~/backups -name "lucid_backup_*.sql" -mtime +7 -delete
@@ -472,7 +472,7 @@ EXIT;
 
 2. If counts are zero, restore again:
 ```bash
-./scripts/transfer_database.sh
+./ops/transfer_database.sh
 ```
 
 ### Cloudflare 502 Error
@@ -532,7 +532,7 @@ ssh luca@lucid-pi.local 'cd ~/LUCID_Finance_WebApp && docker compose restart && 
 ./deploy_to_pi.sh
 
 # Backup database
-./scripts/transfer_database.sh
+./ops/transfer_database.sh
 
 # View all logs
 ssh luca@lucid-pi.local 'sudo journalctl -u lucid-backend -u cloudflared -f'

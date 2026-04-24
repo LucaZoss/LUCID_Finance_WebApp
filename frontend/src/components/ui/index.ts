@@ -18,8 +18,6 @@ export type { SelectProps, SelectOption } from './Select';
 export { Modal, ModalFooter } from './Modal';
 export type { ModalProps, ModalFooterProps } from './Modal';
 
-export { Table } from './Table';
-export type { TableProps, TableColumn } from './Table';
 
 export { LoadingSpinner } from './LoadingSpinner';
 export type { LoadingSpinnerProps } from './LoadingSpinner';

@@ -144,7 +144,7 @@ if [ "$TRANSFER_DB" = true ]; then
 
     # Create temporary backup
     TEMP_BACKUP="temp_deploy_backup_$(date +%Y%m%d_%H%M%S).sql"
-    ./scripts/backup_database.sh "${TEMP_BACKUP}"
+    ./ops/backup_database.sh "${TEMP_BACKUP}"
 
     echo "Transferring backup to Pi..."
     scp "${TEMP_BACKUP}" ${PI_USER}@${PI_HOST}:${PI_DIR}/
@@ -163,7 +163,7 @@ EOF
 else
     # Initialize categories if not transferring database
     echo -e "${YELLOW}Initializing categories...${NC}"
-    ssh ${PI_USER}@${PI_HOST} "cd ${PI_DIR} && \$HOME/.local/bin/uv run python scripts/initialize_categories.py --force"
+    ssh ${PI_USER}@${PI_HOST} "cd ${PI_DIR} && \$HOME/.local/bin/uv run python ops/initialize_categories.py --force"
     echo -e "${GREEN}✓ Categories initialized${NC}"
     echo ""
 fi

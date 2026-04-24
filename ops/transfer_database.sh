@@ -26,7 +26,7 @@ echo ""
 
 # Step 1: Create local backup
 echo -e "${YELLOW}Step 1/3: Creating local backup...${NC}"
-./scripts/backup_database.sh "${BACKUP_FILE}"
+./ops/backup_database.sh "${BACKUP_FILE}"
 echo ""
 
 # Step 2: Transfer to Pi
@@ -40,7 +40,7 @@ echo -e "${YELLOW}Step 3/3: Restoring database on Pi...${NC}"
 ssh ${PI_USER}@${PI_HOST} << EOF
     cd ${PI_DIR}
     echo "Restoring backup on Raspberry Pi..."
-    ./scripts/restore_database.sh ${BACKUP_FILE}
+    ./ops/restore_database.sh ${BACKUP_FILE}
     echo "Cleaning up backup file..."
     rm -f ${BACKUP_FILE}
     echo "Done!"

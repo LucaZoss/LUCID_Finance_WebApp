@@ -61,7 +61,7 @@ echo ""
 
 # 3. Make scripts executable
 echo -e "${YELLOW}Setting up maintenance scripts...${NC}"
-chmod +x ~/LUCID_Finance_WebApp/scripts/pi/*.sh
+chmod +x ~/LUCID_Finance_WebApp/ops/pi/*.sh
 echo -e "${GREEN}✓ Scripts made executable${NC}"
 echo ""
 
@@ -73,7 +73,7 @@ echo ""
 
 # 5. Test backup
 echo -e "${YELLOW}Testing backup script...${NC}"
-if ~/LUCID_Finance_WebApp/scripts/pi/backup_lucid.sh; then
+if ~/LUCID_Finance_WebApp/ops/pi/backup_lucid.sh; then
     echo -e "${GREEN}✓ Backup test successful${NC}"
 else
     echo -e "${YELLOW}⚠ Backup test failed${NC}"
@@ -87,13 +87,13 @@ echo -e "${YELLOW}Setting up automated tasks (cron)...${NC}"
 if ! crontab -l 2>/dev/null | grep -q "backup_lucid.sh"; then
     # Add cron jobs
     (crontab -l 2>/dev/null; echo "# LUCID Finance - Daily backup at 2 AM") | crontab -
-    (crontab -l; echo "0 2 * * * /home/luca/LUCID_Finance_WebApp/scripts/pi/backup_lucid.sh >> /home/luca/backup.log 2>&1") | crontab -
+    (crontab -l; echo "0 2 * * * /home/luca/LUCID_Finance_WebApp/ops/pi/backup_lucid.sh >> /home/luca/backup.log 2>&1") | crontab -
     (crontab -l; echo "") | crontab -
     (crontab -l; echo "# LUCID Finance - Weekly health check (Monday 6 AM)") | crontab -
-    (crontab -l; echo "0 6 * * 1 /home/luca/LUCID_Finance_WebApp/scripts/pi/monitor_disk.sh >> /home/luca/disk_health.log") | crontab -
+    (crontab -l; echo "0 6 * * 1 /home/luca/LUCID_Finance_WebApp/ops/pi/monitor_disk.sh >> /home/luca/disk_health.log") | crontab -
     (crontab -l; echo "") | crontab -
     (crontab -l; echo "# LUCID Finance - Monthly maintenance (first Sunday 4 AM)") | crontab -
-    (crontab -l; echo "0 4 1-7 * 0 /home/luca/LUCID_Finance_WebApp/scripts/pi/maintenance_lucid.sh >> /home/luca/maintenance.log 2>&1") | crontab -
+    (crontab -l; echo "0 4 1-7 * 0 /home/luca/LUCID_Finance_WebApp/ops/pi/maintenance_lucid.sh >> /home/luca/maintenance.log 2>&1") | crontab -
     echo -e "${GREEN}✓ Cron jobs installed${NC}"
 else
     echo -e "${GREEN}✓ Cron jobs already configured${NC}"
@@ -133,9 +133,9 @@ echo "  ✓ Weekly disk health monitoring (Monday 6 AM)"
 echo "  ✓ Monthly database maintenance (first Sunday 4 AM)"
 echo ""
 echo "Manual commands:"
-echo "  Create backup:   ~/LUCID_Finance_WebApp/scripts/pi/backup_lucid.sh"
-echo "  Run maintenance: ~/LUCID_Finance_WebApp/scripts/pi/maintenance_lucid.sh"
-echo "  Check disk:      ~/LUCID_Finance_WebApp/scripts/pi/monitor_disk.sh"
+echo "  Create backup:   ~/LUCID_Finance_WebApp/ops/pi/backup_lucid.sh"
+echo "  Run maintenance: ~/LUCID_Finance_WebApp/ops/pi/maintenance_lucid.sh"
+echo "  Check disk:      ~/LUCID_Finance_WebApp/ops/pi/monitor_disk.sh"
 echo ""
 echo "Log files:"
 echo "  Backups:     ~/backup.log"
